@@ -5,6 +5,7 @@ const toastRoot = document.querySelector("#toast-root");
 const state = {
   loggedIn: false,
   username: "liu",
+  loginStep: "meta-unified",
   activeMain: "首页",
   activePage: "Meta首页",
   userMenuOpen: false,
@@ -21,14 +22,20 @@ const state = {
   detailRefundId: "",
   detailBackMain: "交易管理",
   detailBackPage: "订单查询",
+  customerCode: "",
+};
+
+const customerProfile = {
+  code: "160247771879",
+  name: "博柏利（上海）贸易有限公司",
+  shortName: "博柏利",
+  logoText: "BURBERRY",
 };
 
 const menus = [
-  { name: "交易管理", children: ["订单查询", "门店交易汇总查询"] },
+  { name: "收银管理", children: ["快速收款", "保险卡收款"] },
+  { name: "交易管理", children: ["订单查询", "门店交易汇总查询", "集团销售报表", "按日销售报表", "门店销售报表", "商户对账报表"] },
   { name: "退款管理", children: ["退款申请", "退款查询", "退款复核"] },
-  { name: "销售报表管理", children: ["集团销售报表", "按日销售报表", "门店销售报表"] },
-  { name: "对账管理", children: ["商户对账报表"] },
-  { name: "用户管理", children: ["操作员管理", "角色管理"] },
   { name: "安全设置", children: ["个人密码修改"] },
 ];
 
@@ -346,20 +353,80 @@ function render(options = {}) {
 }
 
 function renderLogin() {
+  const pages = {
+    "meta-unified": renderMetaUnifiedLogin,
+    "enterprise-code": renderEnterpriseLookup,
+    "enterprise-entry": renderEnterpriseEntry,
+    "beizan-login": renderBeizanLogin,
+  };
+  return (pages[state.loginStep] || renderMetaUnifiedLogin)();
+}
+
+function renderLoginShell(content, cardClass = "") {
   return `
     <main class="login-page">
-      <section class="login-card">
-        <div class="brand-block">
-          <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
-        </div>
-        <h1 class="login-title">欢迎登录医药品牌服务平台</h1>
-        <form class="login-form" data-action="login">
-          <input name="account" value="liu" placeholder="请输入账号" />
-          <input name="password" value="123456" type="password" placeholder="请输入密码" />
-          <button class="btn primary" style="height:54px;font-size:16px" type="submit">登录</button>
-        </form>
+      <section class="login-card ${cardClass}">
+        <button class="login-lang" type="button" aria-label="语言">文</button>
+        ${content}
       </section>
     </main>`;
+}
+
+function renderMetaUnifiedLogin() {
+  return renderLoginShell(`
+    <div class="brand-block">
+      <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
+    </div>
+    <h1 class="login-title">欢迎登录品牌服务平台</h1>
+    <form class="login-form" data-action="meta-login">
+      <input name="account" value="liu" placeholder="请输入账号" />
+      <input name="password" value="123456" type="password" placeholder="请输入密码" />
+      <div class="login-links"><button class="btn link muted-link" type="button">忘记密码？</button></div>
+      <button class="btn primary login-submit" type="submit">登录</button>
+      <button class="btn ghost login-submit" type="button" data-action="goto-enterprise-login">企业用户登录</button>
+    </form>
+  `);
+}
+
+function renderEnterpriseLookup() {
+  return renderLoginShell(`
+    <div class="login-heading-block">
+      <h1 class="login-title-strong">企业用户登录</h1>
+      <p class="login-subtitle">请输入客户编号</p>
+    </div>
+    <form class="login-form enterprise-form" data-action="enterprise-lookup">
+      <input name="customerCode" value="${escapeHtml(state.customerCode)}" placeholder="请输入客户编号" />
+      <div class="login-helper">可咨询管理员获取客户编号</div>
+      <button class="btn primary login-submit" type="submit">确认</button>
+    </form>
+  `, "enterprise-card");
+}
+
+function renderEnterpriseEntry() {
+  return renderLoginShell(`
+    <div class="customer-entry">
+      <div class="customer-brand-badge">${escapeHtml(customerProfile.logoText)}</div>
+      <h1 class="login-title-strong">企业用户登录</h1>
+      <div class="customer-entry-name">${escapeHtml(customerProfile.name)}</div>
+      <div class="customer-entry-code">客户编号：${escapeHtml(state.customerCode || customerProfile.code)}</div>
+      <button class="btn primary login-submit" type="button" data-action="goto-beizan-login">倍赞用户登录</button>
+    </div>
+  `, "enterprise-card");
+}
+
+function renderBeizanLogin() {
+  return renderLoginShell(`
+    <div class="brand-block">
+      <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
+    </div>
+    <h1 class="login-title">欢迎登录医药品牌服务平台</h1>
+    <form class="login-form" data-action="beizan-login">
+      <input name="account" value="liu" placeholder="请输入账号" />
+      <input name="password" value="123456" type="password" placeholder="请输入密码" />
+      <div class="login-links"><button class="btn link muted-link" type="button">忘记密码？</button></div>
+      <button class="btn primary login-submit" type="submit">登录</button>
+    </form>
+  `);
 }
 
 function renderApp() {
@@ -523,6 +590,11 @@ function resetToHomeAfterLogin() {
   state.userMenuOpen = false;
 }
 
+function resetLoginFlow() {
+  state.loginStep = "meta-unified";
+  state.customerCode = "";
+}
+
 function renderFilter(fields, actions = true, cols = 4) {
   return `
     <div class="filter-panel">
@@ -576,9 +648,15 @@ function renderTable(columns, rows, options = {}) {
 function renderResultSection(title, content) {
   return `
     <section class="result-section">
-      <h3 class="result-title">${escapeHtml(title)}</h3>
+      <h3 class="result-title">${renderResultTitle(title)}</h3>
       ${content}
     </section>`;
+}
+
+function renderResultTitle(title) {
+  const match = String(title).match(/^(汇总结果)(（统计范围.*）)$/);
+  if (!match) return escapeHtml(title);
+  return `<span class="result-title-main">${escapeHtml(match[1])}</span><span class="result-title-scope">${escapeHtml(match[2])}</span>`;
 }
 
 function renderPlainTable(columns, rows, options = {}) {
@@ -1022,6 +1100,7 @@ function renderStoreSummary() {
             <input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" />
           </div>
           <div class="actions inline-actions">
+            <button class="btn text" data-action="reset-filter">重置</button>
             <button class="btn primary" data-action="query">查询</button>
             <button class="btn" data-action="download">导出</button>
           </div>
@@ -1509,6 +1588,7 @@ function renderSalesReport(type) {
           <div class="field"><label>订单日期</label><input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" /></div>
           <div class="actions">
             <span class="subtle">${titleMap[type]}</span>
+            <button class="btn text" data-action="reset-filter">重置</button>
             <button class="btn primary" data-action="query">查询</button>
             <button class="btn" data-action="download">导出</button>
           </div>
@@ -1821,7 +1901,20 @@ function bindEvents() {
     if (action === "logout") {
       state.loggedIn = false;
       state.userMenuOpen = false;
+      resetLoginFlow();
       render();
+      return;
+    }
+    if (action === "goto-enterprise-login") {
+      state.loginStep = "enterprise-code";
+      state.userMenuOpen = false;
+      render();
+      return;
+    }
+    if (action === "goto-beizan-login") {
+      state.loginStep = "beizan-login";
+      render();
+      return;
     }
     if (action === "query") toast("查询完成，已加载示例数据");
     if (action === "reset-filter") toast("已清空查询条件", "warn");
@@ -1946,7 +2039,18 @@ function bindEvents() {
       showInsuranceProductPicker(form.elements.keyword.value.trim());
       return;
     }
-    if (form.dataset.action !== "login") return;
+    if (form.dataset.action === "enterprise-lookup") {
+      const customerCode = form.elements.customerCode.value.trim();
+      if (!customerCode) {
+        toast("请输入客户编号", "warn");
+        return;
+      }
+      state.customerCode = customerCode;
+      state.loginStep = "enterprise-entry";
+      render();
+      return;
+    }
+    if (!["meta-login", "beizan-login"].includes(form.dataset.action)) return;
     const account = form.elements.account.value.trim();
     state.username = account || "liu";
     state.loggedIn = true;
