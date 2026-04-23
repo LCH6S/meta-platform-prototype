@@ -6,7 +6,7 @@ const state = {
   loggedIn: false,
   username: "liu",
   activeMain: "首页",
-  activePage: "首页",
+  activePage: "Meta首页",
   userMenuOpen: false,
   sidebarScrollTop: 0,
   sidebarCollapsed: {},
@@ -24,10 +24,11 @@ const state = {
 };
 
 const menus = [
-  { name: "首页", children: [] },
-  { name: "收银管理", children: ["快速收款", "保险卡收款"] },
-  { name: "交易管理", children: ["订单查询", "门店交易汇总查询", "集团销售报表", "按日销售报表", "门店销售报表", "商户对账报表"] },
+  { name: "交易管理", children: ["订单查询", "门店交易汇总查询"] },
   { name: "退款管理", children: ["退款申请", "退款查询", "退款复核"] },
+  { name: "销售报表管理", children: ["集团销售报表", "按日销售报表", "门店销售报表"] },
+  { name: "对账管理", children: ["商户对账报表"] },
+  { name: "用户管理", children: ["操作员管理", "角色管理"] },
   { name: "安全设置", children: ["个人密码修改"] },
 ];
 
@@ -364,23 +365,29 @@ function renderLogin() {
 function renderApp() {
   const current = pageTitle();
   const sectioned = isSectionedPage(current);
+  const showSidebar = state.activeMain !== "首页";
+  const activeTopNav = state.activeMain === "首页" ? "首页" : "倍赞";
   return `
     <div class="app">
       <header class="topbar">
         <div class="topbar-left">
           <img class="brand-logo topbar-logo" src="./assets/shouqianba-yellow.png" alt="收钱吧" />
         </div>
+        <nav class="topnav" aria-label="一级导航">
+          <button class="topnav-item ${activeTopNav === "首页" ? "active" : ""}" data-topnav="首页" ${activeTopNav === "首页" ? 'aria-current="page"' : ""}>首页</button>
+          <button class="topnav-item ${activeTopNav === "倍赞" ? "active" : ""}" data-topnav="倍赞" ${activeTopNav === "倍赞" ? 'aria-current="page"' : ""}>倍赞</button>
+        </nav>
         <div class="topbar-right">
           <button class="user-trigger" data-action="toggle-user">${escapeHtml(state.username)}</button>
           ${state.userMenuOpen ? `<div class="user-popover"><button data-action="logout">退出登录</button></div>` : ""}
         </div>
       </header>
-      <div class="main-shell">
-        <aside class="sidebar">${renderSidebar()}</aside>
+      <div class="main-shell ${showSidebar ? "" : "no-sidebar"}">
+        ${showSidebar ? `<aside class="sidebar">${renderSidebar()}</aside>` : ""}
         <main class="content-wrap">
           ${renderBreadcrumb()}
-          <section class="page-card ${sectioned ? "sectioned-card" : ""} ${current === "首页" ? "home-card" : ""}">
-            ${current === "首页" ? "" : `<h2 class="page-title">${escapeHtml(current)}</h2>`}
+          <section class="page-card ${sectioned ? "sectioned-card" : ""} ${current === "Meta首页" ? "home-card" : ""}">
+            ${current === "Meta首页" ? "" : `<h2 class="page-title">${escapeHtml(current)}</h2>`}
             ${renderPage()}
           </section>
         </main>
@@ -420,7 +427,8 @@ function renderSidebar() {
 function renderBreadcrumb() {
   if (state.activePage !== "订单详情") return "";
   const items = [
-    { label: "首页", main: "首页", page: "首页" },
+    { label: "首页", main: "首页", page: "Meta首页" },
+    { label: "倍赞" },
     { label: state.detailBackMain || state.activeMain },
     { label: state.detailBackPage || "订单查询", main: state.detailBackMain || state.activeMain, page: state.detailBackPage || "订单查询" },
     { label: "订单详情", current: true },
@@ -444,7 +452,7 @@ function pageTitle() {
 function renderPage() {
   const page = state.activePage;
   const map = {
-    首页: renderHome,
+    Meta首页: renderHome,
     快速收款: renderQuickCashier,
     保险卡收款: renderInsuranceCardCashier,
     订单查询: renderOrderSearch,
@@ -466,25 +474,53 @@ function renderPage() {
 
 function renderHome() {
   return `
-    <div class="home-page">
-      <section class="home-overview" aria-label="首页概览">
-        <div class="home-head">
-          <div>
-            <div class="home-kicker">医药品牌服务平台</div>
-            <h2 class="welcome-title">欢迎回来，${escapeHtml(state.username)}</h2>
-          </div>
+    <div class="meta-home-page">
+      <section class="tenant-card" aria-label="当前客户信息">
+        <div class="tenant-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none">
+            <path d="M26 12 12 24v28h40V24L38 12H26Z" fill="#2f2f2f"/>
+            <path d="M20 30h4v18h-4V30Zm10-8h4v26h-4V22Zm10 4h4v22h-4V26Z" fill="#fff"/>
+          </svg>
         </div>
-        <div class="home-scope">
-          <div class="home-section-title">所属组织</div>
-          <div class="scope-grid">
-            <div class="scope-item"><div class="label">所属商户</div><div class="value">博悠</div></div>
-            <div class="scope-item"><div class="label">所属分支机构</div><div class="value">华东事业部</div></div>
-            <div class="scope-item"><div class="label">所属片区</div><div class="value">上海片区</div></div>
-            <div class="scope-item"><div class="label">所属门店</div><div class="value">月头礼品卡</div></div>
-          </div>
+        <div class="tenant-info">
+          <h2 class="tenant-name">博柏利（上海）贸易有限公司</h2>
+          <div class="tenant-meta">集团编号：160247771879</div>
         </div>
       </section>
     </div>`;
+}
+
+function getDefaultBeizanLanding() {
+  for (const menu of menus) {
+    if (menu.children?.length) {
+      return { main: menu.name, page: menu.children[0] };
+    }
+  }
+  return { main: "首页", page: "Meta首页" };
+}
+
+function openTopNav(target) {
+  if (target === "首页") {
+    state.activeMain = "首页";
+    state.activePage = "Meta首页";
+    state.userMenuOpen = false;
+    return;
+  }
+  const landing = getDefaultBeizanLanding();
+  if (state.activeMain === "首页" || state.activePage === "Meta首页") {
+    state.activeMain = landing.main;
+    state.activePage = landing.page;
+  }
+  state.userMenuOpen = false;
+}
+
+function resetToHomeAfterLogin() {
+  state.activeMain = "首页";
+  state.activePage = "Meta首页";
+  state.detailOrderNo = "";
+  state.detailRefundId = "";
+  state.refundApplyOrderNo = "";
+  state.userMenuOpen = false;
 }
 
 function renderFilter(fields, actions = true, cols = 4) {
@@ -1746,6 +1782,12 @@ function bindEvents() {
     const action = target.dataset.action;
     const page = target.dataset.page;
     const main = target.dataset.navMain;
+    const topnav = target.dataset.topnav;
+    if (topnav) {
+      openTopNav(topnav);
+      render();
+      return;
+    }
     if (target.dataset.breadcrumbPage) {
       state.activeMain = target.dataset.breadcrumbMain;
       state.activePage = target.dataset.breadcrumbPage;
@@ -1908,8 +1950,7 @@ function bindEvents() {
     const account = form.elements.account.value.trim();
     state.username = account || "liu";
     state.loggedIn = true;
-    state.activeMain = "首页";
-    state.activePage = "首页";
+    resetToHomeAfterLogin();
     render();
     toast("登录成功");
   };

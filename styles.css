@@ -357,6 +357,10 @@ textarea.form-control:focus {
   overflow: hidden;
 }
 
+.main-shell.no-sidebar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar {
   background: #fff;
   border-right: 0;
@@ -1385,51 +1389,6 @@ tbody tr:hover {
   color: #2f54eb;
 }
 
-.home-page {
-  min-height: auto;
-  padding: 44px 56px;
-  background: #f4f5f7;
-}
-
-.home-overview {
-  max-width: 720px;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-}
-
-.home-head {
-  padding: 0 0 28px;
-  border-bottom: 0;
-}
-
-.home-kicker {
-  color: #8a8a8a;
-  font-size: 13px;
-  margin-bottom: 10px;
-}
-
-.welcome-title {
-  margin: 0;
-  color: #111;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.home-scope {
-  padding: 0;
-}
-
-.home-section-title {
-  margin-bottom: 16px;
-  padding-left: 10px;
-  border-left: 3px solid var(--header);
-  color: #111;
-  font-size: 15px;
-  font-weight: 700;
-}
-
 .scope-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -1456,6 +1415,56 @@ tbody tr:hover {
   font-weight: 700;
   line-height: 1.35;
   word-break: break-word;
+}
+
+.meta-home-page {
+  min-height: calc(100vh - 140px);
+  padding: 28px 32px 40px;
+  background: #f4f5f7;
+}
+
+.tenant-card {
+  max-width: 980px;
+  background: #fff;
+  border: 1px solid #ededed;
+}
+
+.tenant-card {
+  margin: 0 auto;
+  padding: 38px 44px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.tenant-icon {
+  width: 92px;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tenant-icon svg {
+  width: 72px;
+  height: 72px;
+}
+
+.tenant-info {
+  min-width: 0;
+}
+
+.tenant-name {
+  margin: 0 0 12px;
+  color: #11253d;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.tenant-meta {
+  color: #9297a1;
+  font-size: 16px;
 }
 
 .empty {
@@ -1670,6 +1679,15 @@ textarea.form-control {
 
   .sidebar {
     display: none;
+  }
+
+  .tenant-card {
+    max-width: none;
+  }
+
+  .tenant-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .insurance-search-form,
