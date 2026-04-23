@@ -5,27 +5,37 @@ const toastRoot = document.querySelector("#toast-root");
 const state = {
   loggedIn: false,
   username: "liu",
+  loginStep: "meta-unified",
   activeMain: "首页",
-  activePage: "首页",
+  activePage: "Meta首页",
   userMenuOpen: false,
   sidebarScrollTop: 0,
   sidebarCollapsed: {},
   expandedStoreSummaryDates: {},
   expandedSalesReportRows: {},
   expandedReconcileRows: {},
+  quickCashierOrder: null,
+  insuranceCart: [],
+  insuranceOrder: null,
+  refundApplyOrderNo: "",
   detailOrderNo: "",
   detailRefundId: "",
   detailBackMain: "交易管理",
   detailBackPage: "订单查询",
+  customerCode: "",
+};
+
+const customerProfile = {
+  code: "160247771879",
+  name: "博柏利（上海）贸易有限公司",
+  shortName: "博柏利",
+  logoText: "BURBERRY",
 };
 
 const menus = [
-  { name: "首页", children: [] },
-  { name: "交易管理", children: ["订单查询", "门店交易汇总查询"] },
+  { name: "收银管理", children: ["快速收款", "保险卡收款"] },
+  { name: "交易管理", children: ["订单查询", "门店交易汇总查询", "集团销售报表", "按日销售报表", "门店销售报表", "商户对账报表"] },
   { name: "退款管理", children: ["退款申请", "退款查询", "退款复核"] },
-  { name: "销售报表管理", children: ["集团销售报表", "按日销售报表", "门店销售报表"] },
-  { name: "对账管理", children: ["商户对账报表"] },
-  { name: "用户管理", children: ["操作员管理", "角色管理"] },
   { name: "安全设置", children: ["个人密码修改"] },
 ];
 
@@ -223,10 +233,10 @@ const orders = [
 ];
 
 let refunds = [
-  { id: "RF20260421001", merchantNo: "EQB2900200021", merchant: "博悠", store: "月头礼品卡", orderNo: "7903247986920027", orderDate: "2026-04-21", platformNo: "S6344242", platformDate: "2026-04-21", amount: 1, status: "退款成功", way: "接口退款", applyTime: "2026-04-21 10:03:47", applicant: "liu", products: "感冒灵颗粒" },
-  { id: "RF20260420001", merchantNo: "EQB2900200021", merchant: "博悠", store: "月头礼品卡", orderNo: "7903247986686896", orderDate: "2026-04-20", platformNo: "S6218377", platformDate: "2026-04-20", amount: 0.1, status: "退款成功", way: "接口退款", applyTime: "2026-04-20 15:39:29", applicant: "liu", products: "葡萄糖酸钙口服液" },
-  { id: "RF20260416001", merchantNo: "EQB2900200021", merchant: "博悠", store: "康宁路药房", orderNo: "790324799616123", orderDate: "2026-04-16", platformNo: "S6500914", platformDate: "2026-04-16", amount: 0.1, status: "退款申请成功（审核中）", way: "人工审核退款", applyTime: "2026-04-22 09:10:12", applicant: "liuliu", products: "阿莫西林胶囊" },
-  { id: "RF20260403001", merchantNo: "EQB2900200021", merchant: "博悠", store: "和平测试", orderNo: "790324798367032", orderDate: "2026-04-03", platformNo: "S6220068", platformDate: "2026-04-03", amount: 0.1, status: "退款申请成功（审核中）", way: "自助审核退款", applyTime: "2026-04-22 09:18:43", applicant: "liuliu", products: "板蓝根颗粒" },
+  { id: "RF20260421001", merchantNo: "EQB2900200021", merchant: "博悠", store: "月头礼品卡", orderNo: "7903247986920027", orderDate: "2026-04-21", platformNo: "S6344242", platformDate: "2026-04-21", amount: 1, status: "退款成功", way: "人工审核退款", applyTime: "2026-04-21 10:03:47", applicant: "liu", reason: "顾客申请退款", products: "感冒灵颗粒" },
+  { id: "RF20260420001", merchantNo: "EQB2900200021", merchant: "博悠", store: "月头礼品卡", orderNo: "7903247986686896", orderDate: "2026-04-20", platformNo: "S6218377", platformDate: "2026-04-20", amount: 0.1, status: "退款成功", way: "人工审核退款", applyTime: "2026-04-20 15:39:29", applicant: "liu", reason: "顾客申请退款", products: "葡萄糖酸钙口服液" },
+  { id: "RF20260416001", merchantNo: "EQB2900200021", merchant: "博悠", store: "康宁路药房", orderNo: "790324799616123", orderDate: "2026-04-16", platformNo: "S6500914", platformDate: "2026-04-16", amount: 0.1, status: "退款申请成功（审核中）", way: "人工审核退款", applyTime: "2026-04-22 09:10:12", applicant: "liuliu", reason: "顾客申请退款", products: "阿莫西林胶囊" },
+  { id: "RF20260403001", merchantNo: "EQB2900200021", merchant: "博悠", store: "和平测试", orderNo: "790324798367032", orderDate: "2026-04-03", platformNo: "S6220068", platformDate: "2026-04-03", amount: 0.1, status: "退款申请成功（审核中）", way: "人工审核退款", applyTime: "2026-04-22 09:18:43", applicant: "liuliu", reason: "顾客申请退款", products: "板蓝根颗粒" },
 ];
 
 let operators = [
@@ -240,6 +250,16 @@ let roles = [
   { id: "R002", name: "门店店长", users: 8, desc: "可查看门店交易、发起退款、查看报表", status: "启用" },
   { id: "R003", name: "财务对账", users: 3, desc: "可查看销售报表和对账报表", status: "启用" },
   { id: "R004", name: "退款复核员", users: 1, desc: "可处理人工审核退款", status: "启用" },
+];
+
+const insuranceProducts = [
+  { code: "100403", name: "二甲硅油片(消胀片)", spec: "25mg*100片", price: 11, approval: "国药准字H31020964", category: "OTC", unit: "盒" },
+  { code: "100676", name: "有机原味豆浆粉", spec: "300克", price: 11, approval: "-", category: "食品", unit: "袋" },
+  { code: "100055", name: "酒神金樽", spec: "380毫克*20粒", price: 11, approval: "国食健字G20110421", category: "保健品", unit: "盒" },
+  { code: "100738", name: "小儿氨酚黄那敏颗粒", spec: "3克*12袋", price: 11, approval: "国药准字H33022118", category: "OTC", unit: "盒" },
+  { code: "100766", name: "盐酸左氧氟沙星胶囊", spec: "0.1g*12粒", price: 11, approval: "国药准字H20058234", category: "处方药", unit: "盒" },
+  { code: "100924", name: "中华跌打丸", spec: "6g*6丸", price: 11, approval: "国药准字Z44020768", category: "OTC", unit: "盒" },
+  { code: "101182", name: "洁热解毒口服液", spec: "10支*10毫升", price: 11, approval: "国药准字Z20010187", category: "OTC", unit: "盒" },
 ];
 
 function yuan(value) {
@@ -256,9 +276,10 @@ function escapeHtml(value) {
 }
 
 function getStatusClass(value) {
-  if (String(value).includes("成功") || value === "启用" || value === "正常") return "success";
-  if (String(value).includes("审核") || String(value).includes("中")) return "warning";
-  if (String(value).includes("失败") || value === "停用") return "danger";
+  const text = String(value);
+  if (text.includes("失败") || value === "停用") return "danger";
+  if (text.includes("审核中") || text.includes("退款中") || text.includes("待")) return "warning";
+  if (text.includes("成功") || value === "启用" || value === "正常") return "success";
   return "";
 }
 
@@ -272,7 +293,7 @@ function toast(message, type = "") {
 function openModal(title, body, footer = "") {
   modalRoot.innerHTML = `
     <div class="modal-mask" data-close-modal>
-      <div class="modal ${footer.includes("small-modal") ? "small-modal" : ""}" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+      <div class="modal ${footer.includes("small-modal") ? "small-modal" : ""}" role="dialog" aria-modal="true">
         <div class="modal-header">
           <h3 class="modal-title">${title}</h3>
           <button class="close-btn" data-close-modal>×</button>
@@ -332,42 +353,108 @@ function render(options = {}) {
 }
 
 function renderLogin() {
+  const pages = {
+    "meta-unified": renderMetaUnifiedLogin,
+    "enterprise-code": renderEnterpriseLookup,
+    "enterprise-entry": renderEnterpriseEntry,
+    "beizan-login": renderBeizanLogin,
+  };
+  return (pages[state.loginStep] || renderMetaUnifiedLogin)();
+}
+
+function renderLoginShell(content, cardClass = "") {
   return `
     <main class="login-page">
-      <section class="login-card">
-        <div class="brand-block">
-          <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
-        </div>
-        <h1 class="login-title">欢迎登录医药品牌服务平台</h1>
-        <form class="login-form" data-action="login">
-          <input name="account" value="liu" placeholder="请输入账号" />
-          <input name="password" value="123456" type="password" placeholder="请输入密码" />
-          <button class="btn primary" style="height:54px;font-size:16px" type="submit">登录</button>
-        </form>
+      <section class="login-card ${cardClass}">
+        <button class="login-lang" type="button" aria-label="语言">文</button>
+        ${content}
       </section>
     </main>`;
+}
+
+function renderMetaUnifiedLogin() {
+  return renderLoginShell(`
+    <div class="brand-block">
+      <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
+    </div>
+    <h1 class="login-title">欢迎登录品牌服务平台</h1>
+    <form class="login-form" data-action="meta-login">
+      <input name="account" value="liu" placeholder="请输入账号" />
+      <input name="password" value="123456" type="password" placeholder="请输入密码" />
+      <div class="login-links"><button class="btn link muted-link" type="button">忘记密码？</button></div>
+      <button class="btn primary login-submit" type="submit">登录</button>
+      <button class="btn ghost login-submit" type="button" data-action="goto-enterprise-login">企业用户登录</button>
+    </form>
+  `);
+}
+
+function renderEnterpriseLookup() {
+  return renderLoginShell(`
+    <div class="login-heading-block">
+      <h1 class="login-title-strong">企业用户登录</h1>
+      <p class="login-subtitle">请输入客户编号</p>
+    </div>
+    <form class="login-form enterprise-form" data-action="enterprise-lookup">
+      <input name="customerCode" value="${escapeHtml(state.customerCode)}" placeholder="请输入客户编号" />
+      <div class="login-helper">可咨询管理员获取客户编号</div>
+      <button class="btn primary login-submit" type="submit">确认</button>
+    </form>
+  `, "enterprise-card");
+}
+
+function renderEnterpriseEntry() {
+  return renderLoginShell(`
+    <div class="customer-entry">
+      <div class="customer-brand-badge">${escapeHtml(customerProfile.logoText)}</div>
+      <h1 class="login-title-strong">企业用户登录</h1>
+      <div class="customer-entry-name">${escapeHtml(customerProfile.name)}</div>
+      <div class="customer-entry-code">客户编号：${escapeHtml(state.customerCode || customerProfile.code)}</div>
+      <button class="btn primary login-submit" type="button" data-action="goto-beizan-login">倍赞用户登录</button>
+    </div>
+  `, "enterprise-card");
+}
+
+function renderBeizanLogin() {
+  return renderLoginShell(`
+    <div class="brand-block">
+      <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
+    </div>
+    <h1 class="login-title">欢迎登录医药品牌服务平台</h1>
+    <form class="login-form" data-action="beizan-login">
+      <input name="account" value="liu" placeholder="请输入账号" />
+      <input name="password" value="123456" type="password" placeholder="请输入密码" />
+      <div class="login-links"><button class="btn link muted-link" type="button">忘记密码？</button></div>
+      <button class="btn primary login-submit" type="submit">登录</button>
+    </form>
+  `);
 }
 
 function renderApp() {
   const current = pageTitle();
   const sectioned = isSectionedPage(current);
+  const showSidebar = state.activeMain !== "首页";
+  const activeTopNav = state.activeMain === "首页" ? "首页" : "倍赞";
   return `
     <div class="app">
       <header class="topbar">
         <div class="topbar-left">
           <img class="brand-logo topbar-logo" src="./assets/shouqianba-yellow.png" alt="收钱吧" />
         </div>
+        <nav class="topnav" aria-label="一级导航">
+          <button class="topnav-item ${activeTopNav === "首页" ? "active" : ""}" data-topnav="首页" ${activeTopNav === "首页" ? 'aria-current="page"' : ""}>首页</button>
+          <button class="topnav-item ${activeTopNav === "倍赞" ? "active" : ""}" data-topnav="倍赞" ${activeTopNav === "倍赞" ? 'aria-current="page"' : ""}>倍赞</button>
+        </nav>
         <div class="topbar-right">
           <button class="user-trigger" data-action="toggle-user">${escapeHtml(state.username)}</button>
           ${state.userMenuOpen ? `<div class="user-popover"><button data-action="logout">退出登录</button></div>` : ""}
         </div>
       </header>
-      <div class="main-shell">
-        <aside class="sidebar">${renderSidebar()}</aside>
+      <div class="main-shell ${showSidebar ? "" : "no-sidebar"}">
+        ${showSidebar ? `<aside class="sidebar">${renderSidebar()}</aside>` : ""}
         <main class="content-wrap">
           ${renderBreadcrumb()}
-          <section class="page-card ${sectioned ? "sectioned-card" : ""}">
-            ${current === "首页" ? "" : `<h2 class="page-title">${escapeHtml(current)}</h2>`}
+          <section class="page-card ${sectioned ? "sectioned-card" : ""} ${current === "Meta首页" ? "home-card" : ""}">
+            ${current === "Meta首页" ? "" : `<h2 class="page-title">${escapeHtml(current)}</h2>`}
             ${renderPage()}
           </section>
         </main>
@@ -407,7 +494,8 @@ function renderSidebar() {
 function renderBreadcrumb() {
   if (state.activePage !== "订单详情") return "";
   const items = [
-    { label: "首页", main: "首页", page: "首页" },
+    { label: "首页", main: "首页", page: "Meta首页" },
+    { label: "倍赞" },
     { label: state.detailBackMain || state.activeMain },
     { label: state.detailBackPage || "订单查询", main: state.detailBackMain || state.activeMain, page: state.detailBackPage || "订单查询" },
     { label: "订单详情", current: true },
@@ -431,7 +519,9 @@ function pageTitle() {
 function renderPage() {
   const page = state.activePage;
   const map = {
-    首页: renderHome,
+    Meta首页: renderHome,
+    快速收款: renderQuickCashier,
+    保险卡收款: renderInsuranceCardCashier,
     订单查询: renderOrderSearch,
     订单详情: renderOrderDetail,
     门店交易汇总查询: renderStoreSummary,
@@ -451,15 +541,58 @@ function renderPage() {
 
 function renderHome() {
   return `
-    <div class="info-band">
-      <p class="welcome-title">欢迎回来，${escapeHtml(state.username)}</p>
-      <div class="scope-grid">
-        <div class="mini-card"><div class="label">所属商户</div><div class="value">博悠</div></div>
-        <div class="mini-card"><div class="label">所属分支机构</div><div class="value">华东事业部</div></div>
-        <div class="mini-card"><div class="label">所属片区</div><div class="value">上海片区</div></div>
-        <div class="mini-card"><div class="label">所属门店</div><div class="value">月头礼品卡</div></div>
-      </div>
+    <div class="meta-home-page">
+      <section class="tenant-card" aria-label="当前客户信息">
+        <div class="tenant-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none">
+            <path d="M26 12 12 24v28h40V24L38 12H26Z" fill="#2f2f2f"/>
+            <path d="M20 30h4v18h-4V30Zm10-8h4v26h-4V22Zm10 4h4v22h-4V26Z" fill="#fff"/>
+          </svg>
+        </div>
+        <div class="tenant-info">
+          <h2 class="tenant-name">博柏利（上海）贸易有限公司</h2>
+          <div class="tenant-meta">集团编号：160247771879</div>
+        </div>
+      </section>
     </div>`;
+}
+
+function getDefaultBeizanLanding() {
+  for (const menu of menus) {
+    if (menu.children?.length) {
+      return { main: menu.name, page: menu.children[0] };
+    }
+  }
+  return { main: "首页", page: "Meta首页" };
+}
+
+function openTopNav(target) {
+  if (target === "首页") {
+    state.activeMain = "首页";
+    state.activePage = "Meta首页";
+    state.userMenuOpen = false;
+    return;
+  }
+  const landing = getDefaultBeizanLanding();
+  if (state.activeMain === "首页" || state.activePage === "Meta首页") {
+    state.activeMain = landing.main;
+    state.activePage = landing.page;
+  }
+  state.userMenuOpen = false;
+}
+
+function resetToHomeAfterLogin() {
+  state.activeMain = "首页";
+  state.activePage = "Meta首页";
+  state.detailOrderNo = "";
+  state.detailRefundId = "";
+  state.refundApplyOrderNo = "";
+  state.userMenuOpen = false;
+}
+
+function resetLoginFlow() {
+  state.loginStep = "meta-unified";
+  state.customerCode = "";
 }
 
 function renderFilter(fields, actions = true, cols = 4) {
@@ -515,9 +648,15 @@ function renderTable(columns, rows, options = {}) {
 function renderResultSection(title, content) {
   return `
     <section class="result-section">
-      <h3 class="result-title">${escapeHtml(title)}</h3>
+      <h3 class="result-title">${renderResultTitle(title)}</h3>
       ${content}
     </section>`;
+}
+
+function renderResultTitle(title) {
+  const match = String(title).match(/^(汇总结果)(（统计范围.*）)$/);
+  if (!match) return escapeHtml(title);
+  return `<span class="result-title-main">${escapeHtml(match[1])}</span><span class="result-title-scope">${escapeHtml(match[2])}</span>`;
 }
 
 function renderPlainTable(columns, rows, options = {}) {
@@ -622,6 +761,131 @@ function renderOrderSearch() {
     ${orderFilters()}
     <div class="toolbar"><span class="subtle">交易明细用于查单、核对状态、查看商品与支付通道信息。</span><button class="btn" data-action="download">导出订单</button><button class="icon-btn" data-action="query" aria-label="列设置" title="列设置">⚙</button></div>
     ${renderTable(orderColumns(true), orders, { total: 43, summary: `收款金额：<b>${yuan(income)}</b> 退款金额：<b class="amount negative">${yuan(refund)}</b>` })}`;
+}
+
+function renderQuickCashier() {
+  const order = state.quickCashierOrder;
+  if (!order) {
+    return `
+      <div class="quick-cashier-page">
+        <section class="quick-cashier-panel">
+          <div class="quick-cashier-head">
+            <h3>收款信息</h3>
+            <p>用于门店线下临时收款，提交后生成待支付订单。</p>
+          </div>
+          <form class="quick-cashier-form" data-action="quick-cashier">
+            <div class="field quick-amount-field">
+              <label>收款金额（元）</label>
+              <input class="form-control" id="quickAmount" name="amount" inputmode="decimal" value="1.00" placeholder="请输入收款金额" />
+            </div>
+            <div class="field">
+              <label>备注</label>
+              <input class="form-control" id="quickRemark" name="remark" placeholder="添加备注信息，便于记忆订单" />
+            </div>
+            <div class="actions quick-cashier-actions">
+              <button class="btn primary" type="submit">提交</button>
+            </div>
+          </form>
+        </section>
+      </div>`;
+  }
+
+  return `
+    <div class="quick-cashier-page">
+      <section class="quick-order-block">
+        <h3 class="result-title">订单详情</h3>
+        <div class="quick-order-summary">
+          <div><span>单号</span><strong>${escapeHtml(order.orderNo)}</strong></div>
+          <div><span>日期</span><strong>${escapeHtml(order.date)}</strong></div>
+          <div><span>金额（元）</span><strong>${yuan(order.amount)}</strong></div>
+          <div><span>状态</span><strong>${escapeHtml(order.status)}</strong></div>
+        </div>
+        <div class="quick-order-actions">
+          ${
+            order.status === "待支付"
+              ? `<button class="btn primary" data-action="quick-cashier-pay">确认支付</button><button class="btn" data-action="reset-quick-cashier">返回</button>`
+              : `<button class="btn primary" data-action="reset-quick-cashier">继续收款</button><button class="btn" data-action="quick-cashier-view-order">查看订单</button>`
+          }
+        </div>
+      </section>
+    </div>`;
+}
+
+function insuranceCartTotal() {
+  return state.insuranceCart.reduce((sum, item) => sum + Number(item.price) * Number(item.qty), 0);
+}
+
+function renderInsuranceCardCashier() {
+  const total = insuranceCartTotal();
+  const order = state.insuranceOrder;
+  const canSubmit = state.insuranceCart.length > 0 && order?.status !== "支付成功";
+  const canPay = order?.status === "待支付";
+  const cartRows = state.insuranceCart.map((item, index) => ({
+    ...item,
+    index: index + 1,
+    amount: item.price * item.qty,
+  }));
+  return `
+    <div class="insurance-cashier-page">
+      <section class="insurance-search-panel">
+        <form class="insurance-search-form" data-action="insurance-search">
+          <input class="form-control" id="insuranceSearch" name="keyword" value="" placeholder="可输入商品号、名称、单价、拼音码等信息" />
+          <button class="btn primary" type="submit">搜索</button>
+        </form>
+      </section>
+
+      <section class="insurance-cart-panel">
+        <div class="insurance-cart-table">
+          ${renderPlainTable(
+            [
+              { title: "序号", key: "index" },
+              { title: "名称", key: "name" },
+              { title: "规格", key: "spec" },
+              {
+                title: "单价",
+                key: "price",
+                render: (row) => `<input class="form-control price-input" data-action="insurance-price" data-code="${row.code}" value="${yuan(row.price)}" inputmode="decimal" aria-label="${escapeHtml(row.name)}单价" />`,
+              },
+              {
+                title: "数量",
+                key: "qty",
+                render: (row) => `
+                  <div class="qty-control">
+                    <button class="icon-btn" data-action="insurance-qty" data-code="${row.code}" data-step="-1" aria-label="减少">−</button>
+                    <input class="form-control qty-input" value="${row.qty}" readonly />
+                    <button class="icon-btn add" data-action="insurance-qty" data-code="${row.code}" data-step="1" aria-label="增加">+</button>
+                  </div>`,
+              },
+              { title: "小计", key: "amount", amount: true },
+              { title: "操作", action: true, render: (row) => `<button class="btn link link-danger" data-action="insurance-remove" data-code="${row.code}">删除</button>` },
+            ],
+            cartRows,
+            { className: "insurance-table" }
+          )}
+        </div>
+        <div class="insurance-submit-row">
+          <span>收款总价</span>
+          <strong>${yuan(total)}</strong>
+          <button class="btn primary" data-action="insurance-presubmit" ${canSubmit ? "" : "disabled"}>提交</button>
+        </div>
+      </section>
+
+      <section class="insurance-order-footer">
+        <div class="insurance-order-meta">
+          <div><span>日期：</span><strong>${order?.date || "-"}</strong></div>
+          <div><span>单号：</span><strong>${order?.orderNo || "-"}</strong></div>
+          <div><span>状态：</span><strong>${order?.status || "-"}</strong></div>
+        </div>
+        <div class="insurance-order-amount"><span>金额：</span><strong>${order ? `¥ ${yuan(order.amount)}` : "-"}</strong></div>
+        <div class="insurance-order-actions">
+          ${
+            order?.status === "支付成功"
+              ? `<button class="btn primary" data-action="insurance-reset">继续收款</button>`
+              : `<button class="btn success" data-action="insurance-pay" ${canPay ? "" : "disabled"}>支付</button>`
+          }
+        </div>
+      </section>
+    </div>`;
 }
 
 function renderOrderDetail() {
@@ -836,6 +1100,7 @@ function renderStoreSummary() {
             <input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" />
           </div>
           <div class="actions inline-actions">
+            <button class="btn text" data-action="reset-filter">重置</button>
             <button class="btn primary" data-action="query">查询</button>
             <button class="btn" data-action="download">导出</button>
           </div>
@@ -952,20 +1217,25 @@ function renderStoreDailyDetailTable(rows) {
 }
 
 function renderRefundApply() {
+  if (state.refundApplyOrderNo) return renderRefundApplyDetail();
   const rows = orders.filter((order) => order.type === "收款").map((order) => ({
     ...order,
     orderDate: order.time.slice(0, 10),
     platformDate: order.time.slice(0, 10),
+    orderTime: order.time,
   }));
   return `
     ${renderFilter([
       { label: "商户", type: "select", options: ["博悠"] },
       { label: "门店", placeholder: "请选择" },
       { label: "商户订单号", placeholder: "请输入商户订单号" },
-      { label: "订单日期", value: "2026-04-01 至 2026-04-22" },
+      { label: "订单日期", type: "dateRange", value: "2026-04-16 至 2026-04-23" },
     ])}
     ${renderTable(
       [
+        { title: "序号", key: "seq" },
+        { title: "商户号", key: "merchantNo" },
+        { title: "商户名称", key: "merchant" },
         { title: "商户门店", key: "store" },
         { title: "商户订单号", key: "orderNo" },
         { title: "商户订单日期", key: "orderDate" },
@@ -975,6 +1245,7 @@ function renderRefundApply() {
         { title: "可退金额", key: "refundable", amount: true },
         { title: "订单类型", key: "type" },
         { title: "订单状态", key: "status", status: true },
+        { title: "订单时间", key: "orderTime" },
         {
           title: "操作",
           action: true,
@@ -986,46 +1257,116 @@ function renderRefundApply() {
     )}`;
 }
 
+function renderRefundApplyDetail() {
+  const order = orders.find((item) => item.orderNo === state.refundApplyOrderNo);
+  if (!order) return `<div class="empty">未找到可退款订单</div><button class="btn" data-action="refund-apply-back">返回</button>`;
+  const productRows = order.products.map((product, index) => ({
+    ...product,
+    index: index + 1,
+    refundableQty: product.qty,
+    refundQty: product.qty,
+    amount: Number(product.price) * Number(product.qty),
+  }));
+  const orderInfo = [
+    ["商户号", order.merchantNo],
+    ["商户名称", order.merchant],
+    ["商户门店", order.store],
+    ["商户订单号", order.orderNo],
+    ["商户订单日期", order.time.slice(0, 10)],
+    ["平台订单号", order.platformNo],
+    ["平台订单日期", order.time.slice(0, 10)],
+    ["订单金额(元)", yuan(order.amount)],
+    ["可退款金额(元)", yuan(order.refundable)],
+  ];
+  return `
+    <div class="refund-apply-detail">
+      <section class="refund-detail-block">
+        <h3 class="result-title">订单详情</h3>
+        ${renderDetailGrid(orderInfo)}
+      </section>
+      <section class="refund-detail-block">
+        <h3 class="result-title">退款信息</h3>
+        <div class="refund-product-label">退款商品</div>
+        ${renderPlainTable(
+          [
+            { title: "选择退款", render: () => `<input type="checkbox" checked />` },
+            { title: "商品编号", key: "code" },
+            { title: "商品名称", key: "name", ellipsis: true },
+            { title: "批准文号", key: "approval" },
+            { title: "商品类型", key: "category" },
+            { title: "规格", key: "spec" },
+            { title: "单位", key: "unit" },
+            { title: "单价", key: "price", amount: true },
+            { title: "可退数量", key: "refundableQty" },
+            { title: "退款数量", render: (row) => `<input class="form-control refund-qty-input" value="${row.refundQty}" />` },
+            { title: "小计", key: "amount", amount: true },
+          ],
+          productRows,
+          { className: "refund-product-table" }
+        )}
+        <div class="refund-amount-row">
+          <div class="field">
+            <label for="refundAmount">退款金额</label>
+            <input class="form-control" id="refundAmount" value="${yuan(order.refundable)}" />
+          </div>
+          <div class="field">
+            <label for="refundReason">退款原因</label>
+            <input class="form-control" id="refundReason" value="顾客申请退款" placeholder="请输入退款原因" />
+          </div>
+        </div>
+        <div class="refund-apply-actions">
+          <button class="btn primary" data-action="submit-refund" data-order="${order.orderNo}">提交申请</button>
+          <button class="btn danger" data-action="refund-apply-back">返回</button>
+        </div>
+      </section>
+    </div>`;
+}
+
 function renderRefundSearch() {
   return `
     ${renderFilter([
       { label: "商户", type: "select", options: ["博悠"] },
-      { label: "片区", type: "select", options: ["全部", "上海片区"] },
       { label: "门店", placeholder: "请选择" },
       { label: "商户订单号", placeholder: "请输入商户订单号" },
       { label: "退款状态", type: "select", options: ["全部", "退款成功", "退款申请成功（审核中）", "退款审核成功（退款中）", "退款审核失败（退款失败）", "无效退款", "退款中", "退款失败"] },
-      { label: "退款方式", type: "select", options: ["全部", "接口退款", "人工审核退款", "自助审核退款"] },
-      { label: "商户订单日期", type: "dateRange", value: "2026-04-15 至 2026-04-22" },
+      { label: "退款方式", type: "select", options: ["全部", "人工审核退款"] },
+      { label: "商户订单日期", type: "dateRange", value: "2026-04-16 至 2026-04-23" },
     ])}
     ${refundTable(refunds, true)}`;
 }
 
 function renderRefundReview() {
-  const pending = refunds.filter((item) => item.status.includes("审核中"));
+  const pending = refunds.filter(isManualReviewRefund);
   return `
     ${renderFilter([
       { label: "商户", type: "select", options: ["博悠"] },
       { label: "门店", placeholder: "请选择" },
       { label: "商户订单号", placeholder: "请输入商户订单号" },
-      { label: "商户订单日期", type: "dateRange", value: "2026-04-15 至 2026-04-22" },
+      { label: "商户订单日期", type: "dateRange", value: "2026-04-16 至 2026-04-23" },
     ])}
+    <div class="toolbar left refund-review-toolbar">
+      <button class="btn" data-action="review-pass">批量退款</button>
+      <button class="btn" data-action="review-reject">批量取消</button>
+    </div>
     ${renderTable(
       [
+        { title: `<input type="checkbox" checked />`, render: () => `<input type="checkbox" checked />` },
         { title: "商户号", key: "merchantNo" },
         { title: "商户名称", key: "merchant" },
         { title: "商户门店", key: "store" },
         { title: "商户订单号", key: "orderNo" },
+        { title: "商户订单日期", key: "orderDate" },
         { title: "退款金额", key: "amount", amount: true },
-        { title: "退款方式", key: "way" },
-        { title: "申请人", key: "applicant" },
+        { title: "退款原因", key: "reason", ellipsis: true },
+        { title: "退款状态", key: "status", status: true },
         { title: "申请时间", key: "applyTime" },
         {
           title: "操作",
           action: true,
           render: (row) => `
             <div class="table-actions">
-              <button class="btn link" data-action="review-pass" data-refund="${row.id}">通过</button>
-              <button class="btn link link-danger" data-action="review-reject" data-refund="${row.id}">驳回</button>
+              <button class="btn link" data-action="review-pass" data-refund="${row.id}">确认退款</button>
+              <button class="btn link link-danger" data-action="review-reject" data-refund="${row.id}">取消退款</button>
             </div>`,
         },
       ],
@@ -1042,6 +1383,7 @@ function refundTable(rows, actions) {
       { title: "商户订单号", key: "orderNo" },
       { title: "商户订单日期", key: "orderDate" },
       { title: "平台订单号", key: "platformNo" },
+      { title: "平台订单日期", key: "platformDate" },
       { title: "退款金额", key: "amount", amount: true },
       { title: "退款状态", key: "status", status: true },
       { title: "退款方式", key: "way" },
@@ -1051,13 +1393,17 @@ function refundTable(rows, actions) {
             {
               title: "操作",
               action: true,
-              render: (row) => `<button class="btn link" data-action="refund-detail" data-order="${row.orderNo}" data-refund="${row.id}">详情</button>`,
+              render: (row) => `<button class="btn link" data-action="refund-products-detail" data-refund="${row.id}">退款商品详情</button>`,
             },
           ]
         : []),
     ],
     rows
   );
+}
+
+function isManualReviewRefund(item) {
+  return item.way === "人工审核退款" && item.status === "退款申请成功（审核中）";
 }
 
 function reportMetricColumns() {
@@ -1242,6 +1588,7 @@ function renderSalesReport(type) {
           <div class="field"><label>订单日期</label><input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" /></div>
           <div class="actions">
             <span class="subtle">${titleMap[type]}</span>
+            <button class="btn text" data-action="reset-filter">重置</button>
             <button class="btn primary" data-action="query">查询</button>
             <button class="btn" data-action="download">导出</button>
           </div>
@@ -1450,7 +1797,6 @@ function showRefundApply(orderNo) {
       <div class="field"><label>商户订单号</label><input class="form-control" value="${order.orderNo}" disabled /></div>
       <div class="field"><label>可退金额</label><input class="form-control" value="${yuan(order.refundable)}" disabled /></div>
       <div class="field"><label>退款金额</label><input class="form-control" id="refundAmount" value="${yuan(order.refundable)}" /></div>
-      <div class="field"><label>退款方式</label><select class="form-control" id="refundWay"><option>人工审核退款</option><option>接口退款</option><option>自助审核退款</option></select></div>
       <div class="field full"><label>退款原因</label><textarea class="form-control" id="refundReason">顾客申请退款</textarea></div>
     </div>`,
     `<button class="btn" data-close-modal>取消</button><button class="btn primary" data-action="submit-refund" data-order="${order.orderNo}">提交申请</button>`
@@ -1501,7 +1847,7 @@ function showRoleForm(id) {
       <div class="field full"><label>说明</label><input class="form-control" id="roleDesc" value="${role.desc}" /></div>
       <div class="field full"><label>权限</label>
         <div class="scope-grid" style="grid-template-columns:repeat(2,1fr)">
-          ${["交易管理", "退款管理", "销售报表管理", "对账管理", "用户管理"].map((p) => `<label><input type="checkbox" checked /> ${p}</label>`).join("")}
+          ${["交易管理", "退款管理", "安全设置"].map((p) => `<label><input type="checkbox" checked /> ${p}</label>`).join("")}
         </div>
       </div>
     </div>`,
@@ -1516,6 +1862,12 @@ function bindEvents() {
     const action = target.dataset.action;
     const page = target.dataset.page;
     const main = target.dataset.navMain;
+    const topnav = target.dataset.topnav;
+    if (topnav) {
+      openTopNav(topnav);
+      render();
+      return;
+    }
     if (target.dataset.breadcrumbPage) {
       state.activeMain = target.dataset.breadcrumbMain;
       state.activePage = target.dataset.breadcrumbPage;
@@ -1537,6 +1889,7 @@ function bindEvents() {
       state.activeMain = main;
       state.activePage = page;
       state.sidebarCollapsed[main] = false;
+      if (page !== "退款申请") state.refundApplyOrderNo = "";
       state.userMenuOpen = false;
       render();
       return;
@@ -1548,7 +1901,20 @@ function bindEvents() {
     if (action === "logout") {
       state.loggedIn = false;
       state.userMenuOpen = false;
+      resetLoginFlow();
       render();
+      return;
+    }
+    if (action === "goto-enterprise-login") {
+      state.loginStep = "enterprise-code";
+      state.userMenuOpen = false;
+      render();
+      return;
+    }
+    if (action === "goto-beizan-login") {
+      state.loginStep = "beizan-login";
+      render();
+      return;
     }
     if (action === "query") toast("查询完成，已加载示例数据");
     if (action === "reset-filter") toast("已清空查询条件", "warn");
@@ -1583,7 +1949,63 @@ function bindEvents() {
       backToDetailList();
       return;
     }
-    if (action === "open-refund-apply") showRefundApply(target.dataset.order);
+    if (action === "reset-quick-cashier") {
+      state.quickCashierOrder = null;
+      render();
+      return;
+    }
+    if (action === "quick-cashier-pay") {
+      showQuickCashierPayment();
+      return;
+    }
+    if (action === "quick-cashier-view-order") {
+      openOrderDetail(state.quickCashierOrder?.orderNo, "", "交易管理", "订单查询");
+      return;
+    }
+    if (action === "insurance-qty") {
+      updateInsuranceQty(target.dataset.code, Number(target.dataset.step));
+      return;
+    }
+    if (action === "insurance-remove") {
+      removeInsuranceProduct(target.dataset.code);
+      return;
+    }
+    if (action === "insurance-presubmit") {
+      preSubmitInsuranceOrder();
+      return;
+    }
+    if (action === "insurance-pay") {
+      payInsuranceOrder();
+      return;
+    }
+    if (action === "insurance-reset") {
+      state.insuranceCart = [];
+      state.insuranceOrder = null;
+      render();
+      return;
+    }
+    if (action === "open-refund-apply") {
+      if (state.activeMain === "退款管理" && state.activePage === "退款申请") {
+        state.refundApplyOrderNo = target.dataset.order;
+        render();
+      } else {
+        showRefundApply(target.dataset.order);
+      }
+      return;
+    }
+    if (action === "refund-apply-back") {
+      state.refundApplyOrderNo = "";
+      render();
+      return;
+    }
+    if (action === "submit-refund") {
+      submitRefund(target.dataset.order, app);
+      return;
+    }
+    if (action === "refund-products-detail") {
+      showRefundProductsDetail(target.dataset.refund);
+      return;
+    }
     if (action === "review-pass") reviewRefund(target.dataset.refund, true);
     if (action === "review-reject") reviewRefund(target.dataset.refund, false);
     if (action === "operator-form") showOperatorForm(target.dataset.user);
@@ -1592,24 +2014,66 @@ function bindEvents() {
     if (action === "change-password") changePassword();
   };
 
+  app.onchange = (event) => {
+    const target = event.target.closest("[data-action='insurance-price']");
+    if (!target) return;
+    updateInsurancePrice(target.dataset.code, target.value);
+  };
+
+  app.onkeydown = (event) => {
+    const target = event.target.closest("[data-action='insurance-price']");
+    if (!target || event.key !== "Enter") return;
+    event.preventDefault();
+    target.blur();
+  };
+
   app.onsubmit = (event) => {
-    const form = event.target.closest("form[data-action='login']");
+    const form = event.target.closest("form");
     if (!form) return;
     event.preventDefault();
+    if (form.dataset.action === "quick-cashier") {
+      submitQuickCashier(form);
+      return;
+    }
+    if (form.dataset.action === "insurance-search") {
+      showInsuranceProductPicker(form.elements.keyword.value.trim());
+      return;
+    }
+    if (form.dataset.action === "enterprise-lookup") {
+      const customerCode = form.elements.customerCode.value.trim();
+      if (!customerCode) {
+        toast("请输入客户编号", "warn");
+        return;
+      }
+      state.customerCode = customerCode;
+      state.loginStep = "enterprise-entry";
+      render();
+      return;
+    }
+    if (!["meta-login", "beizan-login"].includes(form.dataset.action)) return;
     const account = form.elements.account.value.trim();
     state.username = account || "liu";
     state.loggedIn = true;
-    state.activeMain = "首页";
-    state.activePage = "首页";
+    resetToHomeAfterLogin();
     render();
     toast("登录成功");
   };
 
   modalRoot.onclick = (event) => {
-    const target = event.target.closest("button, [data-close-modal]");
-    if (!target) return;
+    const target = event.target.closest("button");
+    if (!target) {
+      if (event.target.dataset.closeModal !== undefined) closeModal();
+      return;
+    }
     if (target.dataset.closeModal !== undefined) closeModal();
     if (target.dataset.action === "submit-refund") submitRefund(target.dataset.order);
+    if (target.dataset.action === "quick-cashier-paid") completeQuickCashierPayment();
+    if (target.dataset.action === "quick-cashier-cancel") {
+      closeModal();
+      toast("已取消本次支付", "warn");
+    }
+    if (target.dataset.action === "add-insurance-product") addInsuranceProduct(target.dataset.code);
+    if (target.dataset.action === "insurance-paid") completeInsurancePayment();
     if (target.dataset.action === "save-operator") saveOperator(target.dataset.user);
     if (target.dataset.action === "save-role") saveRole(target.dataset.role);
   };
@@ -1619,19 +2083,304 @@ function bindEvents() {
   };
 }
 
-function submitRefund(orderNo) {
+function submitQuickCashier(form) {
+  clearFieldErrors(app);
+  const amountText = fieldValue("#quickAmount", app);
+  const amount = Number(amountText);
+  const remark = fieldValue("#quickRemark", app);
+  if (!amountText || Number.isNaN(amount) || amount <= 0) showFieldError("#quickAmount", "请输入大于 0 的收款金额", app);
+  if (amount > 999999.99) showFieldError("#quickAmount", "单笔收款金额不能超过 999999.99 元", app);
+  if (app.querySelector(".field.error")) {
+    focusFirstError(app);
+    return;
+  }
+  const orderNo = `M20260423${String(Date.now()).slice(-8)}`;
+  state.quickCashierOrder = {
+    orderNo,
+    date: "2026-04-23",
+    amount,
+    remark,
+    status: "待支付",
+  };
+  render();
+  toast("订单已提交，请确认支付");
+}
+
+function showQuickCashierPayment() {
+  const order = state.quickCashierOrder;
+  if (!order) return;
+  openModal(
+    "收钱吧倍赞提示",
+    `<div class="payment-state">
+      <div class="payment-icon">?</div>
+      <div>
+        <strong>支付中...</strong>
+        <p>订单金额 ${yuan(order.amount)} 元，请根据收银设备或支付结果确认订单状态。</p>
+      </div>
+    </div>`,
+    `<button class="btn primary" data-action="quick-cashier-paid">支付完成</button><button class="btn" data-action="quick-cashier-cancel">支付取消</button>`
+  );
+}
+
+function completeQuickCashierPayment() {
+  const order = state.quickCashierOrder;
+  if (!order) return;
+  state.quickCashierOrder = { ...order, status: "支付成功" };
+  if (!orders.some((item) => item.orderNo === order.orderNo)) {
+    orders.unshift({
+      seq: orders.length + 1,
+      merchantNo: "EQB2900200021",
+      merchant: "博悠",
+      storeNo: "LPK001",
+      store: "月头礼品卡",
+      area: "上海片区",
+      time: "2026-04-23 19:37:43",
+      orderNo: order.orderNo,
+      platformNo: `S${String(Date.now()).slice(-7)}`,
+      amount: order.amount,
+      type: "收款",
+      status: "支付成功",
+      payWay: "快速收款",
+      success: true,
+      refundable: order.amount,
+      products: [{ code: "-", name: order.remark || "购物", approval: "-", category: "-", spec: "-", unit: "-", price: order.amount, qty: 1 }],
+      payDetail: { channelFlow: order.orderNo, channelOrder: "无" },
+    });
+  }
+  closeModal();
+  render();
+  toast("支付完成，订单已入账");
+}
+
+function showInsuranceProductPicker(keyword = "") {
+  const normalized = keyword.trim().toLowerCase();
+  const rows = insuranceProducts.filter((item) => {
+    if (!normalized) return true;
+    return [item.code, item.name, item.spec, item.price, item.approval, item.category].some((value) => String(value).toLowerCase().includes(normalized));
+  });
+  openModal(
+    "选择保险卡商品",
+    `<div class="insurance-picker">
+      ${renderPlainTable(
+        [
+          { title: "商品编号", key: "code" },
+          { title: "名称", key: "name" },
+          { title: "规格", key: "spec" },
+          { title: "单价", key: "price", amount: true },
+          { title: "操作", action: true, render: (row) => `<button class="btn link" data-action="add-insurance-product" data-code="${row.code}">添加</button>` },
+        ],
+        rows,
+        { className: "insurance-picker-table" }
+      )}
+    </div>`,
+    `<button class="btn" data-close-modal>关闭</button>`
+  );
+}
+
+function addInsuranceProduct(code) {
+  const product = insuranceProducts.find((item) => item.code === code);
+  if (!product) return;
+  const existing = state.insuranceCart.find((item) => item.code === code);
+  if (existing) {
+    state.insuranceCart = state.insuranceCart.map((item) => (item.code === code ? { ...item, qty: item.qty + 1 } : item));
+  } else {
+    state.insuranceCart = [...state.insuranceCart, { ...product, qty: 1 }];
+  }
+  state.insuranceOrder = null;
+  closeModal();
+  render();
+  toast("商品已添加");
+}
+
+function updateInsuranceQty(code, step) {
+  state.insuranceCart = state.insuranceCart
+    .map((item) => (item.code === code ? { ...item, qty: Math.max(1, item.qty + step) } : item))
+    .filter((item) => item.qty > 0);
+  state.insuranceOrder = null;
+  render({ preserveContentScroll: true });
+}
+
+function updateInsurancePrice(code, value) {
+  const price = Number(value);
+  if (!value || Number.isNaN(price) || price <= 0) {
+    toast("请输入大于 0 的单价", "warn");
+    render({ preserveContentScroll: true });
+    return;
+  }
+  if (price > 999999.99) {
+    toast("单价不能超过 999999.99 元", "warn");
+    render({ preserveContentScroll: true });
+    return;
+  }
+  state.insuranceCart = state.insuranceCart.map((item) => (item.code === code ? { ...item, price } : item));
+  state.insuranceOrder = null;
+  render({ preserveContentScroll: true });
+}
+
+function removeInsuranceProduct(code) {
+  state.insuranceCart = state.insuranceCart.filter((item) => item.code !== code);
+  state.insuranceOrder = null;
+  render({ preserveContentScroll: true });
+  toast("商品已删除", "warn");
+}
+
+function preSubmitInsuranceOrder() {
+  if (!state.insuranceCart.length) {
+    toast("请先添加商品", "warn");
+    return;
+  }
+  const amount = insuranceCartTotal();
+  state.insuranceOrder = {
+    orderNo: `BX20260423${String(Date.now()).slice(-8)}`,
+    date: "2026-04-23 20:15:46",
+    amount,
+    status: "待支付",
+  };
+  render({ preserveContentScroll: true });
+  openModal(
+    "预提交完成",
+    `<div class="insurance-order-tip">
+      <h4>预提交完成</h4>
+      <p>单号：${escapeHtml(state.insuranceOrder.orderNo)}，金额：${yuan(amount)}</p>
+      <p class="emphasis">订单已更新为可支付状态，请直接进行支付</p>
+    </div>`,
+    `<button class="btn primary" data-close-modal>知道了</button>`
+  );
+}
+
+function payInsuranceOrder() {
+  const order = state.insuranceOrder;
+  if (!order || order.status !== "待支付") return;
+  openModal(
+    "正在支付",
+    `<div class="payment-state insurance-paying">
+      <div class="payment-icon">⌛</div>
+      <div>
+        <strong>正在支付，请稍候...</strong>
+        <p>保险卡收款金额 ${yuan(order.amount)} 元。</p>
+      </div>
+    </div>`,
+    `<button class="btn primary" data-action="insurance-paid">支付完成</button><button class="btn" data-close-modal>取消</button>`
+  );
+}
+
+function completeInsurancePayment() {
+  const order = state.insuranceOrder;
+  if (!order) return;
+  if (!orders.some((item) => item.orderNo === order.orderNo)) {
+    orders.unshift({
+      seq: orders.length + 1,
+      merchantNo: "EQB2900200021",
+      merchant: "博悠",
+      storeNo: "LPK001",
+      store: "月头礼品卡",
+      area: "上海片区",
+      time: "2026-04-23 20:15:46",
+      orderNo: order.orderNo,
+      platformNo: `BX${String(Date.now()).slice(-7)}`,
+      amount: order.amount,
+      type: "收款",
+      status: "支付成功",
+      payWay: "保险卡",
+      success: true,
+      refundable: order.amount,
+      products: state.insuranceCart.map((item) => ({
+        code: item.code,
+        name: item.name,
+        approval: item.approval,
+        category: item.category,
+        spec: item.spec,
+        unit: item.unit,
+        price: item.price,
+        qty: item.qty,
+      })),
+      payDetail: { channelFlow: order.orderNo, channelOrder: "无" },
+    });
+  }
+  state.insuranceCart = [];
+  state.insuranceOrder = null;
+  closeModal();
+  render();
+  toast("保险卡支付完成，已清空本次商品");
+}
+
+function showRefundProductsDetail(refundId) {
+  const refund = refunds.find((item) => item.id === refundId);
+  if (!refund) return;
+  const order = orders.find((item) => item.orderNo === refund.orderNo);
+  const products = order?.products?.length
+    ? order.products.map((product, index) => ({
+        ...product,
+        index: index + 1,
+        refundQty: product.qty,
+        amount: Number(product.price) * Number(product.qty),
+      }))
+    : [
+        {
+          index: 1,
+          code: "-",
+          name: refund.products,
+          approval: "-",
+          category: "-",
+          spec: "-",
+          unit: "-",
+          price: refund.amount,
+          refundQty: 1,
+          amount: refund.amount,
+        },
+      ];
+  const refundInfo = [
+    ["退款单号", refund.id],
+    ["商户订单号", refund.orderNo],
+    ["商户订单日期", refund.orderDate],
+    ["平台订单号", refund.platformNo || "-"],
+    ["退款金额(元)", yuan(refund.amount)],
+    ["退款状态", refund.status],
+    ["退款方式", refund.way],
+    ["申请时间", refund.applyTime],
+  ];
+  openModal(
+    "退款商品详情",
+    `<div class="refund-products-modal">
+      ${renderDetailGrid(refundInfo)}
+      ${renderPlainTable(
+        [
+          { title: "序号", key: "index" },
+          { title: "商品编号", key: "code" },
+          { title: "商品名称", key: "name", ellipsis: true },
+          { title: "批准文号", key: "approval" },
+          { title: "商品类型", key: "category" },
+          { title: "规格", key: "spec" },
+          { title: "单位", key: "unit" },
+          { title: "单价", key: "price", amount: true },
+          { title: "退款数量", key: "refundQty" },
+          { title: "小计", key: "amount", amount: true },
+        ],
+        products,
+        { className: "refund-product-table" }
+      )}
+    </div>`,
+    `<button class="btn primary" data-close-modal>确定</button>`
+  );
+}
+
+function refundInitialStatus() {
+  return "退款申请成功（审核中）";
+}
+
+function submitRefund(orderNo, root = modalRoot) {
   const order = orders.find((item) => item.orderNo === orderNo);
   if (!order) return;
-  clearFieldErrors(modalRoot);
-  const amountText = fieldValue("#refundAmount", modalRoot);
+  clearFieldErrors(root);
+  const amountText = fieldValue("#refundAmount", root);
   const amount = Number(amountText || order.refundable);
-  const way = fieldValue("#refundWay", modalRoot) || "人工审核退款";
-  const reason = fieldValue("#refundReason", modalRoot);
-  if (!amountText || Number.isNaN(amount) || amount <= 0) showFieldError("#refundAmount", "请输入大于 0 的退款金额", modalRoot);
-  if (amount > Number(order.refundable)) showFieldError("#refundAmount", `退款金额不能超过可退金额 ${yuan(order.refundable)}`, modalRoot);
-  if (!reason) showFieldError("#refundReason", "请填写退款原因", modalRoot);
-  if (modalRoot.querySelector(".field.error")) {
-    focusFirstError(modalRoot);
+  const way = "人工审核退款";
+  const reason = fieldValue("#refundReason", root);
+  if (!amountText || Number.isNaN(amount) || amount <= 0) showFieldError("#refundAmount", "请输入大于 0 的退款金额", root);
+  if (amount > Number(order.refundable)) showFieldError("#refundAmount", `退款金额不能超过可退金额 ${yuan(order.refundable)}`, root);
+  if (!reason) showFieldError("#refundReason", "请填写退款原因", root);
+  if (root.querySelector(".field.error")) {
+    focusFirstError(root);
     return;
   }
   refunds.unshift({
@@ -1644,13 +2393,15 @@ function submitRefund(orderNo) {
     platformNo: order.platformNo,
     platformDate: order.time.slice(0, 10),
     amount,
-    status: way === "接口退款" ? "退款中" : "退款申请成功（审核中）",
+    status: refundInitialStatus(),
     way,
-    applyTime: "2026-04-22 10:30:00",
+    applyTime: "2026-04-23 21:16:16",
     applicant: state.username,
+    reason,
     products: order.products.map((p) => p.name).join("、"),
   });
-  closeModal();
+  if (root === modalRoot) closeModal();
+  state.refundApplyOrderNo = "";
   state.activeMain = "退款管理";
   state.activePage = "退款查询";
   render();
@@ -1658,11 +2409,17 @@ function submitRefund(orderNo) {
 }
 
 function reviewRefund(id, pass) {
-  const message = pass ? "确认通过这笔退款审核？" : "确认驳回这笔退款申请？";
+  const targets = id ? refunds.filter((item) => item.id === id && isManualReviewRefund(item)) : refunds.filter(isManualReviewRefund);
+  if (!targets.length) {
+    toast("暂无待复核退款", "warn");
+    return;
+  }
+  const message = id ? (pass ? "确认退款吗？" : "确认取消退款吗？") : pass ? `确认通过选中的 ${targets.length} 笔退款审核？` : `确认取消选中的 ${targets.length} 笔退款申请？`;
   if (!window.confirm(message)) return;
-  refunds = refunds.map((item) => (item.id === id ? { ...item, status: pass ? "退款审核成功（退款中）" : "退款审核失败（退款失败）" } : item));
+  const targetIds = new Set(targets.map((item) => item.id));
+  refunds = refunds.map((item) => (targetIds.has(item.id) ? { ...item, status: pass ? "退款审核成功（退款中）" : "退款审核失败（退款失败）" } : item));
   render();
-  toast(pass ? "审核通过，退款处理中" : "已驳回退款申请", pass ? "" : "warn");
+  toast(pass ? "退款审核成功" : "已取消退款申请", pass ? "" : "warn");
 }
 
 function saveOperator(id) {
