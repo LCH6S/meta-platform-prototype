@@ -26,10 +26,11 @@ const state = {
 };
 
 const customerProfile = {
-  code: "160247771879",
-  name: "博柏利（上海）贸易有限公司",
-  shortName: "博柏利",
-  logoText: "BURBERRY",
+  code: "160247730728",
+  name: "国大药房",
+  shortName: "国大药房",
+  logo: "./assets/guoda-pharmacy.png",
+  logoAlt: "国大药房",
 };
 
 const menus = [
@@ -405,7 +406,9 @@ function renderEnterpriseLookup() {
 function renderEnterpriseEntry() {
   return renderLoginShell(`
     <div class="customer-entry">
-      <div class="customer-brand-badge">${escapeHtml(customerProfile.logoText)}</div>
+      <div class="customer-brand-badge">
+        <img src="${escapeHtml(customerProfile.logo)}" alt="${escapeHtml(customerProfile.logoAlt)}" />
+      </div>
       <h1 class="login-title-strong">企业用户登录</h1>
       <div class="customer-entry-name">${escapeHtml(customerProfile.name)}</div>
       <div class="customer-entry-code">客户编号：${escapeHtml(state.customerCode || customerProfile.code)}</div>
@@ -417,13 +420,12 @@ function renderEnterpriseEntry() {
 function renderBeizanLogin() {
   return renderLoginShell(`
     <div class="brand-block">
-      <img class="brand-logo login-logo" src="./assets/shouqianba-standard.png" alt="收钱吧" />
+      <img class="brand-logo login-logo" src="${escapeHtml(customerProfile.logo)}" alt="${escapeHtml(customerProfile.logoAlt)}" />
     </div>
-    <h1 class="login-title">欢迎登录医药品牌服务平台</h1>
+    <h1 class="login-title">欢迎登录品牌服务平台</h1>
     <form class="login-form" data-action="beizan-login">
       <input name="account" value="liu" placeholder="请输入账号" />
       <input name="password" value="123456" type="password" placeholder="请输入密码" />
-      <div class="login-links"><button class="btn link muted-link" type="button">忘记密码？</button></div>
       <button class="btn primary login-submit" type="submit">登录</button>
     </form>
   `);
@@ -550,8 +552,8 @@ function renderHome() {
           </svg>
         </div>
         <div class="tenant-info">
-          <h2 class="tenant-name">博柏利（上海）贸易有限公司</h2>
-          <div class="tenant-meta">集团编号：160247771879</div>
+          <h2 class="tenant-name">${escapeHtml(customerProfile.name)}</h2>
+          <div class="tenant-meta">集团编号：${escapeHtml(customerProfile.code)}</div>
         </div>
       </section>
     </div>`;
