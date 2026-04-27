@@ -293,15 +293,15 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 200px;
-  height: 84px;
-  padding: 0 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f4eadf, #efe0cf);
-  color: #1f2c3d;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  width: 240px;
+  height: 72px;
+}
+
+.customer-brand-badge img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .customer-entry-name {
