@@ -11,9 +11,6 @@ const state = {
   userMenuOpen: false,
   sidebarScrollTop: 0,
   sidebarCollapsed: {},
-  expandedStoreSummaryDates: {},
-  expandedSalesReportRows: {},
-  expandedReconcileRows: {},
   quickCashierOrder: null,
   insuranceCart: [],
   insuranceOrder: null,
@@ -23,6 +20,7 @@ const state = {
   detailBackMain: "交易管理",
   detailBackPage: "订单查询",
   customerCode: "",
+  exportRecords: [],
 };
 
 const customerProfile = {
@@ -263,6 +261,15 @@ const insuranceProducts = [
   { code: "101182", name: "洁热解毒口服液", spec: "10支*10毫升", price: 11, approval: "国药准字Z20010187", category: "OTC", unit: "盒" },
 ];
 
+const storeSuggestOptions = [
+  { storeNo: "LPK001", storeName: "月头礼品卡" },
+  { storeNo: "LPK002", storeName: "康宁路药房" },
+  { storeNo: "LPK003", storeName: "长宁医保店" },
+  { storeNo: "LPK004", storeName: "和平测试" },
+];
+
+const reportPayWays = ["银联刷卡h", "微信支付", "医保电子凭证", "支付宝"];
+
 function yuan(value) {
   return Number(value).toFixed(2);
 }
@@ -310,6 +317,95 @@ function openModal(title, body, footer = "") {
 
 function closeModal() {
   modalRoot.innerHTML = "";
+}
+
+function currentTaskType() {
+  const page = state.activePage || "导出任务";
+  if (page === "订单查询") return "订单查询";
+  if (page === "门店交易汇总查询") return "门店交易汇总查询";
+  return page;
+}
+
+function formatCurrentMinute() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function createExportRecord() {
+  const record = {
+    id: String(Date.now()).slice(-10),
+    type: currentTaskType(),
+    requestedAt: formatCurrentMinute(),
+    status: "执行完成",
+  };
+  state.exportRecords = [record, ...state.exportRecords].slice(0, 8);
+  return record;
+}
+
+function requestAsyncExport() {
+  createExportRecord();
+  render();
+  modalRoot.innerHTML = `
+    <div class="modal-mask" data-close-modal>
+      <div class="modal small-modal export-success-modal" role="dialog" aria-modal="true">
+        <div class="export-success-body">
+          <div class="export-success-icon">✓</div>
+          <div>
+            <h3>导出请求成功</h3>
+            <p>表格生成中，请稍后至导出列表查看</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-close-modal>取消</button>
+          <button class="btn primary" data-action="open-export-records">查看导出列表</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showExportRecords() {
+  const rows = state.exportRecords.length
+    ? state.exportRecords
+        .map(
+          (record) => `
+            <tr>
+              <td>${escapeHtml(record.id)}</td>
+              <td>${escapeHtml(record.type)}</td>
+              <td>${escapeHtml(record.requestedAt)}</td>
+              <td>${escapeHtml(record.status)}</td>
+              <td><button class="btn link" data-action="download-export-record" data-record="${escapeHtml(record.id)}">${record.status === "执行完成" ? "下载" : "生成中"}</button></td>
+            </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="5"><div class="export-record-empty">暂无导出记录</div></td></tr>`;
+  modalRoot.innerHTML = `
+    <div class="drawer-mask" data-close-modal>
+      <aside class="export-drawer" role="dialog" aria-modal="true" aria-label="导出记录">
+        <div class="export-drawer-header">
+          <h3>导出记录</h3>
+          <button class="close-btn" data-close-modal>×</button>
+        </div>
+        <div class="export-drawer-body">
+          <p class="export-drawer-tip">仅保留近三天的导出记录</p>
+          <div class="export-record-table-wrap">
+            <table class="export-record-table">
+              <thead>
+                <tr><th>请求编号</th><th>任务类型</th><th>请求时间</th><th>导出状态</th><th>操作</th></tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div class="export-record-pager">
+            <span>共${state.exportRecords.length}条</span>
+            <button class="page-num muted" disabled>‹</button>
+            <button class="page-num active">1</button>
+            <button class="page-num muted" disabled>›</button>
+            <button class="btn small muted" disabled>10 条/页</button>
+          </div>
+        </div>
+      </aside>
+    </div>`;
 }
 
 function clearFieldErrors(root = document) {
@@ -411,7 +507,7 @@ function renderEnterpriseEntry() {
       </div>
       <h1 class="login-title-strong">企业用户登录</h1>
       <div class="customer-entry-name">${escapeHtml(customerProfile.name)}</div>
-      <div class="customer-entry-code">客户编号：${escapeHtml(state.customerCode || customerProfile.code)}</div>
+      <div class="customer-entry-code">客户编号：${escapeHtml(customerProfile.code)}</div>
       <button class="btn primary login-submit" type="button" data-action="goto-beizan-login">倍赞用户登录</button>
     </div>
   `, "enterprise-card");
@@ -447,6 +543,10 @@ function renderApp() {
           <button class="topnav-item ${activeTopNav === "倍赞" ? "active" : ""}" data-topnav="倍赞" ${activeTopNav === "倍赞" ? 'aria-current="page"' : ""}>倍赞</button>
         </nav>
         <div class="topbar-right">
+          <button class="topbar-icon-btn export-record-trigger" data-action="open-export-records" title="导出记录" aria-label="导出记录">
+            <span class="export-record-icon">⇩</span>
+            ${state.exportRecords.length ? `<span class="export-record-badge">${state.exportRecords.length}</span>` : ""}
+          </button>
           <button class="user-trigger" data-action="toggle-user">${escapeHtml(state.username)}</button>
           ${state.userMenuOpen ? `<div class="user-popover"><button data-action="logout">退出登录</button></div>` : ""}
         </div>
@@ -597,7 +697,8 @@ function resetLoginFlow() {
   state.customerCode = "";
 }
 
-function renderFilter(fields, actions = true, cols = 4) {
+function renderFilter(fields, actions = true, cols = 4, actionOptions = {}) {
+  const downloadButton = actionOptions.downloadLabel ? `<button class="btn" data-action="download">${actionOptions.downloadLabel}</button>` : "";
   return `
     <div class="filter-panel">
       <div class="filter-grid ${cols === 3 ? "cols-3" : ""}">
@@ -609,13 +710,46 @@ function renderFilter(fields, actions = true, cols = 4) {
             if (field.type === "select") {
               return `<div class="field"><label>${field.label}</label><select class="form-control">${field.options.map((option) => `<option>${option}</option>`).join("")}</select></div>`;
             }
+            if (field.type === "storeSuggest") {
+              return renderStoreSuggestField(field);
+            }
             if (field.type === "dateRange") {
               return `<div class="field"><label>${field.label}</label><input class="form-control date-range-control" value="${field.value || ""}" placeholder="${field.placeholder || "请选择日期范围"}" /></div>`;
             }
             return `<div class="field"><label>${field.label}</label><input class="form-control" value="${field.value || ""}" placeholder="${field.placeholder || ""}" /></div>`;
           })
           .join("")}
-        ${actions ? `<div class="actions"><button class="btn text" data-action="reset-filter">重置</button><button class="btn primary" data-action="query">查询</button></div>` : ""}
+        ${actions ? `<div class="actions"><button class="btn text" data-action="reset-filter">重置</button><button class="btn primary" data-action="query">查询</button>${downloadButton}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+function storeSuggestLabel(option) {
+  return `${option.storeNo}/${option.storeName}`;
+}
+
+function renderStoreSuggestField(field = {}) {
+  const placeholder = field.placeholder || "请选择";
+  return `
+    <div class="field store-suggest-field" data-store-suggest>
+      <label>${escapeHtml(field.label || "门店")}</label>
+      <div class="store-suggest-control">
+        <input class="form-control store-suggest-input" value="${escapeHtml(field.value || "")}" placeholder="${escapeHtml(placeholder)}" autocomplete="off" data-store-suggest-input />
+        <div class="store-suggest-panel" data-store-suggest-panel>
+          ${storeSuggestOptions
+            .map((option) => {
+              const label = storeSuggestLabel(option);
+              const searchText = `${option.storeNo} ${option.storeName}`.toLowerCase();
+              return `
+                <button class="store-suggest-option" type="button" data-action="store-suggest-select" data-value="${escapeHtml(label)}" data-search="${escapeHtml(searchText)}">
+                  <span class="store-suggest-no">${escapeHtml(option.storeNo)}</span>
+                  <span class="store-suggest-separator">/</span>
+                  <span class="store-suggest-name">${escapeHtml(option.storeName)}</span>
+                </button>`;
+            })
+            .join("")}
+          <div class="store-suggest-empty" data-store-suggest-empty hidden>未找到匹配门店</div>
+        </div>
       </div>
     </div>`;
 }
@@ -656,9 +790,7 @@ function renderResultSection(title, content) {
 }
 
 function renderResultTitle(title) {
-  const match = String(title).match(/^(汇总结果)(（统计范围.*）)$/);
-  if (!match) return escapeHtml(title);
-  return `<span class="result-title-main">${escapeHtml(match[1])}</span><span class="result-title-scope">${escapeHtml(match[2])}</span>`;
+  return escapeHtml(title);
 }
 
 function renderPlainTable(columns, rows, options = {}) {
@@ -717,17 +849,22 @@ function resolveRowKey(row, index, rowKey) {
 }
 
 function orderFilters() {
-  return renderFilter([
-    { label: "商户", type: "select", options: ["博悠", "澄一金融"] },
-    { label: "片区", type: "select", options: ["全部", "上海片区", "华东片区"] },
-    { label: "门店", placeholder: "请选择" },
-    { label: "交易日期", type: "dateRange", value: "2026-04-01 至 2026-04-22" },
-    { label: "交易单号", placeholder: "请输入交易单号" },
-    { label: "渠道平台单号", placeholder: "请输入平台单号" },
-    { label: "交易类型", type: "select", options: ["全部", "收款", "退款"] },
-    { label: "支付方式", type: "select", options: ["全部", "银联刷卡h", "医保电子凭证", "支付宝", "微信支付"] },
-    { label: "只看成功交易", id: "successOnly", type: "checkbox", checked: true },
-  ]);
+  return renderFilter(
+    [
+      { label: "商户", type: "select", options: ["博悠", "澄一金融"] },
+      { label: "片区", type: "select", options: ["全部", "上海片区", "华东片区"] },
+      { label: "门店", type: "storeSuggest", placeholder: "请选择" },
+      { label: "交易日期", type: "dateRange", value: "2026-04-01 至 2026-04-22" },
+      { label: "交易单号", placeholder: "请输入交易单号" },
+      { label: "渠道平台单号", placeholder: "请输入平台单号" },
+      { label: "交易类型", type: "select", options: ["全部", "收款", "退款"] },
+      { label: "支付方式", type: "select", options: ["全部", "银联刷卡h", "医保电子凭证", "支付宝", "微信支付"] },
+      { label: "只看成功交易", id: "successOnly", type: "checkbox", checked: true },
+    ],
+    true,
+    4,
+    { downloadLabel: "导出订单" }
+  );
 }
 
 function orderColumns(showActions = true) {
@@ -761,7 +898,7 @@ function renderOrderSearch() {
   const refund = orders.filter((o) => o.amount < 0).reduce((sum, o) => sum + o.amount, 0);
   return `
     ${orderFilters()}
-    <div class="toolbar"><span class="subtle">交易明细用于查单、核对状态、查看商品与支付通道信息。</span><button class="btn" data-action="download">导出订单</button><button class="icon-btn" data-action="query" aria-label="列设置" title="列设置">⚙</button></div>
+    <div class="toolbar"><span class="subtle">交易明细用于查单、核对状态、查看商品与支付通道信息。</span><button class="icon-btn" data-action="query" aria-label="列设置" title="列设置">⚙</button></div>
     ${renderTable(orderColumns(true), orders, { total: 43, summary: `收款金额：<b>${yuan(income)}</b> 退款金额：<b class="amount negative">${yuan(refund)}</b>` })}`;
 }
 
@@ -1064,31 +1201,56 @@ function formatDateTime(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
-function renderStoreSummary() {
-  const rows = [
-    { date: "2026-04-01", unionPayCount: 6, unionPayAmount: 5.3, unionRefundCount: 3, unionRefundAmount: -1, wechatPayCount: 2, wechatPayAmount: 1.2, wechatRefundCount: 0, wechatRefundAmount: 0 },
-    { date: "2026-04-02", unionPayCount: 9, unionPayAmount: 5.1, unionRefundCount: 2, unionRefundAmount: -0.2, wechatPayCount: 1, wechatPayAmount: 0.8, wechatRefundCount: 0, wechatRefundAmount: 0 },
-    { date: "2026-04-03", unionPayCount: 7, unionPayAmount: 1.6, unionRefundCount: 8, unionRefundAmount: -1.5, wechatPayCount: 3, wechatPayAmount: 2.4, wechatRefundCount: 1, wechatRefundAmount: -0.4 },
-    { date: "2026-04-10", unionPayCount: 1, unionPayAmount: 1, unionRefundCount: 1, unionRefundAmount: -1, wechatPayCount: 0, wechatPayAmount: 0, wechatRefundCount: 0, wechatRefundAmount: 0 },
-    { date: "2026-04-16", unionPayCount: 1, unionPayAmount: 0.1, unionRefundCount: 0, unionRefundAmount: 0, wechatPayCount: 4, wechatPayAmount: 3.2, wechatRefundCount: 1, wechatRefundAmount: -0.6 },
-    { date: "2026-04-20", unionPayCount: 1, unionPayAmount: 0.1, unionRefundCount: 1, unionRefundAmount: -0.1, wechatPayCount: 2, wechatPayAmount: 1.6, wechatRefundCount: 0, wechatRefundAmount: 0 },
-    { date: "2026-04-21", unionPayCount: 2, unionPayAmount: 1.1, unionRefundCount: 1, unionRefundAmount: -1, wechatPayCount: 5, wechatPayAmount: 4.5, wechatRefundCount: 1, wechatRefundAmount: -0.5 },
-  ];
-  const summary = rows.reduce(
-    (total, row) => ({
-      date: "汇总",
-      unionPayCount: total.unionPayCount + row.unionPayCount,
-      unionPayAmount: total.unionPayAmount + row.unionPayAmount,
-      unionRefundCount: total.unionRefundCount + row.unionRefundCount,
-      unionRefundAmount: total.unionRefundAmount + row.unionRefundAmount,
-      wechatPayCount: total.wechatPayCount + row.wechatPayCount,
-      wechatPayAmount: total.wechatPayAmount + row.wechatPayAmount,
-      wechatRefundCount: total.wechatRefundCount + row.wechatRefundCount,
-      wechatRefundAmount: total.wechatRefundAmount + row.wechatRefundAmount,
-      isSummary: true,
-    }),
-    { date: "汇总", unionPayCount: 0, unionPayAmount: 0, unionRefundCount: 0, unionRefundAmount: 0, wechatPayCount: 0, wechatPayAmount: 0, wechatRefundCount: 0, wechatRefundAmount: 0, isSummary: true }
+const storeSummaryPaymentMethods = [
+  { title: "支付宝", prefix: "alipay", countBase: 18, countStep: 3, amountAvg: 42.6, refundCycle: 5, refundAvg: 28.8 },
+  { title: "微信支付", prefix: "wechat", countBase: 22, countStep: 4, amountAvg: 39.5, refundCycle: 6, refundAvg: 24.5 },
+  { title: "银联云闪付", prefix: "cloudPay", countBase: 8, countStep: 2, amountAvg: 51.2, refundCycle: 7, refundAvg: 31.6 },
+  { title: "银联刷卡", prefix: "cardPay", countBase: 6, countStep: 2, amountAvg: 58.4, refundCycle: 8, refundAvg: 36.2 },
+];
+
+function buildStoreSummaryRows(days = 30) {
+  return Array.from({ length: days }, (_, index) => {
+    const day = index + 1;
+    const row = { date: `2026-04-${String(day).padStart(2, "0")}` };
+    storeSummaryPaymentMethods.forEach((method, methodIndex) => {
+      const payCount = method.countBase + ((day * method.countStep + methodIndex * 2) % 11);
+      const refundCount = day % method.refundCycle === 0 ? 2 : (day + methodIndex) % method.refundCycle === 0 ? 1 : 0;
+      row[`${method.prefix}PayCount`] = payCount;
+      row[`${method.prefix}PayAmount`] = Number((payCount * method.amountAvg + ((day + methodIndex) % 4) * 3.5).toFixed(2));
+      row[`${method.prefix}RefundCount`] = refundCount;
+      row[`${method.prefix}RefundAmount`] = Number((refundCount * method.refundAvg * -1).toFixed(2));
+    });
+    return row;
+  });
+}
+
+function summarizeStoreRows(rows) {
+  return rows.reduce(
+    (total, row) => {
+      storeSummaryPaymentMethods.forEach((method) => {
+        total[`${method.prefix}PayCount`] += row[`${method.prefix}PayCount`];
+        total[`${method.prefix}PayAmount`] += row[`${method.prefix}PayAmount`];
+        total[`${method.prefix}RefundCount`] += row[`${method.prefix}RefundCount`];
+        total[`${method.prefix}RefundAmount`] += row[`${method.prefix}RefundAmount`];
+      });
+      return total;
+    },
+    storeSummaryPaymentMethods.reduce(
+      (total, method) => ({
+        ...total,
+        [`${method.prefix}PayCount`]: 0,
+        [`${method.prefix}PayAmount`]: 0,
+        [`${method.prefix}RefundCount`]: 0,
+        [`${method.prefix}RefundAmount`]: 0,
+      }),
+      { date: "总计", isSummary: true }
+    )
   );
+}
+
+function renderStoreSummary() {
+  const rows = buildStoreSummaryRows(30);
+  const summary = summarizeStoreRows(rows);
   return `
     <div class="sectioned-page">
       <div class="filter-panel">
@@ -1099,7 +1261,7 @@ function renderStoreSummary() {
           </div>
           <div class="field">
             <label>订单日期</label>
-            <input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" />
+            <input class="form-control date-range-control" value="2026-04-01 至 2026-04-30" />
           </div>
           <div class="actions inline-actions">
             <button class="btn text" data-action="reset-filter">重置</button>
@@ -1114,103 +1276,182 @@ function renderStoreSummary() {
 
 function renderStoreDailySummaryTable(rows, summary) {
   return `
-    ${renderResultSection("汇总结果（统计范围 2026-04-01 至 2026-04-22）", renderStoreSummaryResult(summary))}
-    ${renderResultSection(
-      "明细结果",
-      `${renderStoreDailyDetailTable(rows)}
+    <section class="result-section store-summary-result-section">
+      ${renderStoreDailyDetailTable(rows, summary)}
       <div class="summary-bar">
         <div>共<b>${rows.length}</b>条</div>
-      </div>`
-    )}`;
+      </div>
+    </section>`;
 }
 
 function storeSummarySubtotal(row) {
-  return {
-    payCount: row.unionPayCount + row.wechatPayCount,
-    payAmount: row.unionPayAmount + row.wechatPayAmount,
-    refundCount: row.unionRefundCount + row.wechatRefundCount,
-    refundAmount: row.unionRefundAmount + row.wechatRefundAmount,
-  };
+  return storeSummaryPaymentMethods.reduce(
+    (total, method) => ({
+      payCount: total.payCount + row[`${method.prefix}PayCount`],
+      payAmount: total.payAmount + row[`${method.prefix}PayAmount`],
+      refundCount: total.refundCount + row[`${method.prefix}RefundCount`],
+      refundAmount: total.refundAmount + row[`${method.prefix}RefundAmount`],
+    }),
+    { payCount: 0, payAmount: 0, refundCount: 0, refundAmount: 0 }
+  );
 }
 
-function storePaymentRows(row) {
-  return [
-    { payWay: "银联刷卡h", payCount: row.unionPayCount, payAmount: row.unionPayAmount, refundCount: row.unionRefundCount, refundAmount: row.unionRefundAmount },
-    { payWay: "微信支付", payCount: row.wechatPayCount, payAmount: row.wechatPayAmount, refundCount: row.wechatRefundCount, refundAmount: row.wechatRefundAmount },
-  ].map((item) => ({
-    ...item,
-    countTotal: item.payCount + item.refundCount,
-    amountTotal: item.payAmount + item.refundAmount,
-  }));
-}
-
-function storePaymentColumns() {
-  return [
-    { title: "支付方式", key: "payWay" },
-    { title: "支付笔数", key: "payCount" },
-    { title: "支付金额", key: "payAmount", amount: true },
-    { title: "退款笔数", render: (row) => `<span class="amount negative">${row.refundCount}</span>` },
-    { title: "退款金额", key: "refundAmount", amount: true },
-    { title: "笔数小计", key: "countTotal" },
-    { title: "金额小计", key: "amountTotal", amount: true },
-  ];
-}
-
-function renderStoreSummaryResult(summary) {
-  const subtotal = storeSummarySubtotal(summary);
-  const rows = [
-    ...storePaymentRows(summary),
-    {
-      payWay: "合计",
-      payCount: subtotal.payCount,
-      payAmount: subtotal.payAmount,
-      refundCount: subtotal.refundCount,
-      refundAmount: subtotal.refundAmount,
-      countTotal: subtotal.payCount + subtotal.refundCount,
-      amountTotal: subtotal.payAmount + subtotal.refundAmount,
-    },
-  ];
-  return renderPlainTable(storePaymentColumns(), rows, { className: "summary-result-table compact-table" });
-}
-
-function renderStoreDailyDetailTable(rows) {
+function renderStoreDailyDetailTable(rows, summary) {
   const moneyCell = (value) => `<span class="amount ${Number(value) < 0 ? "negative" : ""}">${yuan(value)}</span>`;
+  const paymentCells = (row, prefix) => `
+    <td>${row[`${prefix}PayCount`]}</td>
+    <td>${moneyCell(row[`${prefix}PayAmount`])}</td>
+    <td><span class="amount negative">${row[`${prefix}RefundCount`]}</span></td>
+    <td>${moneyCell(row[`${prefix}RefundAmount`])}</td>`;
+  const tableRows = [...rows, summary];
   return `
-    <div class="table-wrap">
-      <table class="compact-table">
+    <div class="table-wrap grouped-stat-table-wrap store-summary-table-wrap has-sticky-dimensions">
+      <table class="compact-table grouped-stat-table">
         <thead>
           <tr>
-            <th>日期</th>
+            <th class="sticky-date-col" rowspan="2">日期</th>
+            ${storeSummaryPaymentMethods.map((method) => `<th colspan="4">${method.title}</th>`).join("")}
+            <th colspan="4">小计</th>
+          </tr>
+          <tr>
+            ${storeSummaryPaymentMethods.map(() => `<th>支付笔数</th><th>支付金额</th><th>退款笔数</th><th>退款金额</th>`).join("")}
             <th>支付笔数</th>
             <th>支付金额</th>
             <th>退款笔数</th>
             <th>退款金额</th>
-            <th>笔数小计</th>
-            <th>金额小计</th>
-            <th class="action-cell">操作</th>
           </tr>
         </thead>
         <tbody>
-          ${rows
+          ${tableRows
             .map((row) => {
               const subtotal = storeSummarySubtotal(row);
-              const expanded = !!state.expandedStoreSummaryDates[row.date];
               return `
-                <tr>
-                  <td>${escapeHtml(row.date)}</td>
+                <tr class="${row.isSummary ? "total-row" : ""}">
+                  <td class="sticky-date-col">${escapeHtml(row.date)}</td>
+                  ${storeSummaryPaymentMethods.map((method) => paymentCells(row, method.prefix)).join("")}
                   <td>${subtotal.payCount}</td>
                   <td>${moneyCell(subtotal.payAmount)}</td>
                   <td><span class="amount negative">${subtotal.refundCount}</span></td>
                   <td>${moneyCell(subtotal.refundAmount)}</td>
-                  <td>${subtotal.payCount + subtotal.refundCount}</td>
-                  <td>${moneyCell(subtotal.payAmount + subtotal.refundAmount)}</td>
-                  <td class="action-cell"><button class="btn link" data-action="toggle-store-summary-date" data-date="${row.date}">${expanded ? "收起" : "展开"}</button></td>
-                </tr>
-                ${
-                  expanded
-                    ? `<tr class="drilldown-row"><td colspan="8">${renderPlainTable(storePaymentColumns(), storePaymentRows(row), { className: "nested-table compact-table" })}</td></tr>`
-                    : ""
-                }`;
+                </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+const groupedDimensionColumnWidth = 128;
+const groupedMetricColumnWidth = 112;
+
+function uniquePayWays(rows, payWayKey = "payWay") {
+  return Array.from(
+    rows.reduce((set, row) => {
+      if (row[payWayKey]) set.add(row[payWayKey]);
+      return set;
+    }, new Set())
+  );
+}
+
+function pickDimensionValues(columns, row) {
+  return columns.reduce(
+    (values, column) => ({
+      ...values,
+      [column.key]: row[column.key],
+    }),
+    {}
+  );
+}
+
+function summaryDimensionValues(columns, label = "总计") {
+  return columns.reduce(
+    (values, column, index) => ({
+      ...values,
+      [column.key]: index === 0 ? label : "",
+    }),
+    {}
+  );
+}
+
+function stickyDimensionStyle(index) {
+  const left = index * groupedDimensionColumnWidth;
+  return `style="left: ${left}px; width: ${groupedDimensionColumnWidth}px; min-width: ${groupedDimensionColumnWidth}px; max-width: ${groupedDimensionColumnWidth}px;"`;
+}
+
+function dimensionColumnStyle() {
+  return `style="width: ${groupedDimensionColumnWidth}px; min-width: ${groupedDimensionColumnWidth}px; max-width: ${groupedDimensionColumnWidth}px;"`;
+}
+
+function renderMetricCells(row, columns) {
+  return columns.map((column) => `<td class="${columnClass(column)}">${renderCell(column, row, 0)}</td>`).join("");
+}
+
+function renderDimensionHeaderCell(column, index, fixedDimensionCount) {
+  const sticky = index < fixedDimensionCount;
+  return `<th class="${sticky ? "sticky-dimension-col" : "dimension-col"}" rowspan="2" ${sticky ? stickyDimensionStyle(index) : dimensionColumnStyle()}>${column.title}</th>`;
+}
+
+function renderDimensionBodyCell(column, index, values, fixedDimensionCount) {
+  const sticky = index < fixedDimensionCount;
+  return `<td class="${sticky ? "sticky-dimension-col" : "dimension-col"} ${columnClass(column)}" ${sticky ? stickyDimensionStyle(index) : dimensionColumnStyle()}>${renderCell(column, values, 0)}</td>`;
+}
+
+function renderGroupedMetricTable({ dimensionColumns, metricColumns, sourceRows, groupKey, sumRows, payWayKey = "payWay", fixedDimensionCount = dimensionColumns.length }) {
+  const payWays = uniquePayWays(sourceRows, payWayKey);
+  const safeFixedDimensionCount = Math.min(fixedDimensionCount, dimensionColumns.length);
+  const groupedRows = Array.from(
+    sourceRows
+      .reduce((map, row) => {
+        const key = groupKey(row);
+        const current = map.get(key) || {
+          dimensions: pickDimensionValues(dimensionColumns, row),
+          sourceRows: [],
+        };
+        current.sourceRows.push(row);
+        map.set(key, current);
+        return map;
+      }, new Map())
+      .values()
+  );
+  const tableRows = [
+    ...groupedRows,
+    {
+      dimensions: summaryDimensionValues(dimensionColumns),
+      sourceRows,
+      isSummary: true,
+    },
+  ];
+  const metricHeaders = metricColumns.map((column) => `<th class="${columnClass(column)}">${column.title}</th>`).join("");
+  const dimensionWidth = dimensionColumns.length * groupedDimensionColumnWidth;
+  const fixedDimensionWidth = safeFixedDimensionCount * groupedDimensionColumnWidth;
+  const minWidth = dimensionWidth + (payWays.length + 1) * metricColumns.length * groupedMetricColumnWidth;
+
+  return `
+    <div class="table-wrap grouped-stat-table-wrap has-sticky-dimensions" style="--sticky-dimension-width: ${fixedDimensionWidth}px;">
+      <table class="compact-table grouped-stat-table" style="min-width: ${minWidth}px;">
+        <thead>
+          <tr>
+            ${dimensionColumns.map((column, index) => renderDimensionHeaderCell(column, index, safeFixedDimensionCount)).join("")}
+            ${payWays.map((payWay) => `<th colspan="${metricColumns.length}">${escapeHtml(payWay)}</th>`).join("")}
+            <th colspan="${metricColumns.length}">小计</th>
+          </tr>
+          <tr>
+            ${payWays.map(() => metricHeaders).join("")}
+            ${metricHeaders}
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows
+            .map((row) => {
+              const subtotal = sumRows(row.sourceRows);
+              return `
+                <tr class="${row.isSummary ? "total-row" : ""}">
+                  ${dimensionColumns
+                    .map((column, index) => renderDimensionBodyCell(column, index, row.dimensions, safeFixedDimensionCount))
+                    .join("")}
+                  ${payWays.map((payWay) => renderMetricCells(sumRows(row.sourceRows.filter((item) => item[payWayKey] === payWay)), metricColumns)).join("")}
+                  ${renderMetricCells(subtotal, metricColumns)}
+                </tr>`;
             })
             .join("")}
         </tbody>
@@ -1404,6 +1645,59 @@ function refundTable(rows, actions) {
   );
 }
 
+function roundMoney(value) {
+  return Number(value.toFixed(2));
+}
+
+function reportMetric(seed, payWayIndex, scale = 1) {
+  const payCount = Math.round((6 + ((seed * 5 + payWayIndex * 3) % 18)) * scale);
+  const payAmount = roundMoney(payCount * (8.6 + payWayIndex * 2.35) + ((seed + payWayIndex) % 5) * 1.7);
+  const refundCount = (seed + payWayIndex) % 6 === 0 ? 2 : (seed + payWayIndex) % 4 === 0 ? 1 : 0;
+  const refundAmount = roundMoney(refundCount * (4.8 + payWayIndex * 1.25) * -1);
+  const fee = roundMoney(payAmount * (0.0025 + payWayIndex * 0.0008));
+  return { payCount, payAmount, refundCount, refundAmount, fee };
+}
+
+function buildGroupSalesRows() {
+  return [
+    { name: "博悠", type: "直营店", payWay: "银联刷卡h", ...reportMetric(1, 0, 2.1) },
+    { name: "博悠", type: "直营店", payWay: "微信支付", ...reportMetric(2, 1, 1.6) },
+    { name: "博悠", type: "直营店", payWay: "医保电子凭证", ...reportMetric(3, 2, 1.3) },
+    { name: "博悠", type: "直营店", payWay: "支付宝", ...reportMetric(4, 3, 1.5) },
+    { name: "博悠", type: "加盟店", payWay: "银联刷卡h", ...reportMetric(5, 0, 1.2) },
+    { name: "博悠", type: "加盟店", payWay: "微信支付", ...reportMetric(6, 1, 1.1) },
+    { name: "博悠", type: "加盟店", payWay: "医保电子凭证", ...reportMetric(7, 2, 0.9) },
+    { name: "博悠", type: "加盟店", payWay: "支付宝", ...reportMetric(8, 3, 1.0) },
+  ];
+}
+
+function buildDailySalesRows(days = 30) {
+  return Array.from({ length: days }, (_, dayIndex) => {
+    const day = dayIndex + 1;
+    return reportPayWays.map((payWay, payWayIndex) => ({
+      date: `2026-04-${String(day).padStart(2, "0")}`,
+      payWay,
+      ...reportMetric(day, payWayIndex),
+    }));
+  }).flat();
+}
+
+function buildStoreSalesRows(count = 30) {
+  const storeNames = ["月头礼品卡", "康宁路药房", "长宁医保店", "和平测试", "浦东张杨店", "静安南京西路店", "徐汇天钥桥店", "杨浦五角场店", "虹口四川北路店", "普陀长寿路店"];
+  return Array.from({ length: count }, (_, storeIndex) => {
+    const storeNo = `LPK${String(storeIndex + 1).padStart(3, "0")}`;
+    const store = storeIndex < 4 ? storeSuggestOptions[storeIndex].storeName : `${storeNames[storeIndex % storeNames.length]}${String(storeIndex + 1).padStart(2, "0")}`;
+    const storeType = storeIndex % 5 === 0 ? "加盟店" : "直营店";
+    return reportPayWays.map((payWay, payWayIndex) => ({
+      storeNo,
+      store,
+      storeType,
+      payWay,
+      ...reportMetric(storeIndex + 1, payWayIndex, 0.75 + (storeIndex % 4) * 0.18),
+    }));
+  }).flat();
+}
+
 function isManualReviewRefund(item) {
   return item.way === "人工审核退款" && item.status === "退款申请成功（审核中）";
 }
@@ -1412,18 +1706,16 @@ function reportMetricColumns() {
   return [
     { title: "支付笔数", key: "payCount" },
     { title: "支付金额", key: "payAmount", amount: true },
-    { title: "退款笔数", render: (row) => `<span class="amount negative">${row.refundCount}</span>` },
+    { title: "退款笔数", key: "refundCount", render: (row) => `<span class="amount negative">${row.refundCount}</span>` },
     { title: "退款金额", key: "refundAmount", amount: true },
-    { title: "笔数小计", key: "countTotal" },
-    { title: "金额小计", key: "amountTotal", amount: true },
+    { title: "手续费", key: "fee", amount: true },
   ];
 }
 
 function withReportTotals(row) {
   return {
     ...row,
-    countTotal: row.payCount + row.refundCount,
-    amountTotal: row.payAmount + row.refundAmount,
+    fee: row.fee || 0,
   };
 }
 
@@ -1435,25 +1727,11 @@ function sumReportRows(rows) {
         payAmount: total.payAmount + row.payAmount,
         refundCount: total.refundCount + row.refundCount,
         refundAmount: total.refundAmount + row.refundAmount,
+        fee: total.fee + (row.fee || 0),
       }),
-      { payCount: 0, payAmount: 0, refundCount: 0, refundAmount: 0 }
+      { payCount: 0, payAmount: 0, refundCount: 0, refundAmount: 0, fee: 0 }
     )
   );
-}
-
-function summarizeByPayWay(rows, includeTotal = false) {
-  const map = new Map();
-  rows.forEach((row) => {
-    const current = map.get(row.payWay) || { payWay: row.payWay, payCount: 0, payAmount: 0, refundCount: 0, refundAmount: 0 };
-    current.payCount += row.payCount;
-    current.payAmount += row.payAmount;
-    current.refundCount += row.refundCount;
-    current.refundAmount += row.refundAmount;
-    map.set(row.payWay, current);
-  });
-  const result = Array.from(map.values()).map(withReportTotals);
-  if (includeTotal) result.push({ payWay: "合计", ...sumReportRows(rows) });
-  return result;
 }
 
 function salesReportConfig(type) {
@@ -1463,133 +1741,82 @@ function salesReportConfig(type) {
         { title: "商户", key: "name" },
         { title: "门店类型", key: "type" },
       ],
+      fixedDimensionCount: 1,
       key: (row) => `${row.name}|${row.type}`,
     },
     daily: {
       dimensions: [{ title: "日期", key: "date" }],
+      fixedDimensionCount: 1,
       key: (row) => row.date,
     },
     store: {
       dimensions: [
-        { title: "门店号", key: "storeNo" },
         { title: "门店", key: "store" },
+        { title: "门店号", key: "storeNo" },
         { title: "门店类型", key: "storeType" },
       ],
+      fixedDimensionCount: 1,
       key: (row) => row.storeNo,
     },
   };
   return configs[type];
 }
 
-function aggregateSalesReportRows(type, rows) {
-  const config = salesReportConfig(type);
-  const map = new Map();
-  rows.forEach((row) => {
-    const key = config.key(row);
-    const current =
-      map.get(key) ||
-      config.dimensions.reduce(
-        (item, column) => ({
-          ...item,
-          [column.key]: row[column.key],
-        }),
-        { reportKey: key, payCount: 0, payAmount: 0, refundCount: 0, refundAmount: 0 }
-      );
-    current.payCount += row.payCount;
-    current.payAmount += row.payAmount;
-    current.refundCount += row.refundCount;
-    current.refundAmount += row.refundAmount;
-    map.set(key, current);
-  });
-  return Array.from(map.values()).map(withReportTotals);
-}
-
-function reportScopeTitle() {
-  return "汇总结果（统计范围 商户：博悠 / 片区：全部 / 门店：全部 / 订单日期：2026-04-01 至 2026-04-22）";
-}
-
 function renderSalesReportResults(type, sourceRows) {
-  const summaryRows = summarizeByPayWay(sourceRows, true);
-  const detailRows = aggregateSalesReportRows(type, sourceRows);
-  return `
-    ${renderResultSection(reportScopeTitle(), renderPlainTable([{ title: "支付方式", key: "payWay" }, ...reportMetricColumns()], summaryRows, { className: "summary-result-table compact-table" }))}
-    ${renderResultSection(
-      "明细结果",
-      `${renderSalesReportDetailTable(type, detailRows, sourceRows)}
-      <div class="summary-bar">
-        <div>共<b>${detailRows.length}</b>条</div>
-        <div class="pager"><button class="page-num active">1</button><button class="page-num">2</button><button class="btn small">下一页</button><span>10 条/页</span></div>
-      </div>`
-    )}`;
-}
-
-function renderSalesReportDetailTable(type, detailRows, sourceRows) {
   const config = salesReportConfig(type);
-  const columns = [...config.dimensions, ...reportMetricColumns()];
+  const total = new Set(sourceRows.map((row) => config.key(row))).size;
   return `
-    <div class="table-wrap">
-      <table class="compact-table">
-        <thead>
-          <tr>${columns.map((column) => `<th class="${columnClass(column)}">${column.title}</th>`).join("")}<th class="action-cell">操作</th></tr>
-        </thead>
-        <tbody>
-          ${detailRows
-            .map((row) => {
-              const expanded = !!state.expandedSalesReportRows[`${type}:${row.reportKey}`];
-              const drillRows = summarizeByPayWay(sourceRows.filter((source) => config.key(source) === row.reportKey));
-              return `
-                <tr>
-                  ${columns.map((column) => `<td class="${columnClass(column)}">${renderCell(column, row, 0)}</td>`).join("")}
-                  <td class="action-cell"><button class="btn link" data-action="toggle-sales-report-row" data-report="${type}" data-key="${row.reportKey}">${expanded ? "收起" : "展开"}</button></td>
-                </tr>
-                ${
-                  expanded
-                    ? `<tr class="drilldown-row"><td colspan="${columns.length + 1}">${renderPlainTable([{ title: "支付方式", key: "payWay" }, ...reportMetricColumns()], drillRows, { className: "nested-table compact-table" })}</td></tr>`
-                    : ""
-                }`;
-            })
-            .join("")}
-        </tbody>
-      </table>
-    </div>`;
+    <section class="result-section grouped-report-result-section">
+      ${renderGroupedMetricTable({
+        dimensionColumns: config.dimensions,
+        metricColumns: reportMetricColumns(),
+        sourceRows,
+        groupKey: config.key,
+        sumRows: sumReportRows,
+        fixedDimensionCount: config.fixedDimensionCount,
+      })}
+      <div class="summary-bar">
+        <div>共<b>${total}</b>条</div>
+        <div class="pager"><button class="page-num active">1</button><button class="page-num">2</button><button class="btn small">下一页</button><span>10 条/页</span></div>
+      </div>
+    </section>`;
 }
 
 function renderSalesReport(type) {
-  const titleMap = {
-    group: "按商户维度统计，区分直营店和加盟店。",
-    daily: "按日期维度统计所选对象每日交易情况。",
-    store: "按门店维度统计所选日期范围内每个门店交易情况。",
-  };
+  const filterFields = [
+    { label: "商户", type: "select", options: ["博悠"] },
+    ...(type === "group"
+      ? []
+      : [
+          { label: "片区", type: "select", options: ["全部", "上海片区", "华东片区"] },
+          { label: "门店", type: "storeSuggest", placeholder: "请选择" },
+        ]),
+    { label: "订单日期", type: "dateRange", value: "2026-04-01 至 2026-04-22" },
+  ];
   const rowsMap = {
-    group: [
-      { name: "博悠", type: "直营店", payWay: "银联刷卡h", payCount: 18, payAmount: 12.2, refundCount: 11, refundAmount: -3.1 },
-      { name: "博悠", type: "直营店", payWay: "微信支付", payCount: 7, payAmount: 1, refundCount: 4, refundAmount: -0.7 },
-      { name: "博悠", type: "加盟店", payWay: "支付宝", payCount: 10, payAmount: 7.8, refundCount: 1, refundAmount: -0.3 },
-      { name: "博悠", type: "加盟店", payWay: "医保电子凭证", payCount: 6, payAmount: 2, refundCount: 2, refundAmount: -0.6 },
-    ],
-    daily: [
-      { date: "2026-04-20", payWay: "银联刷卡h", payCount: 1, payAmount: 0.1, refundCount: 1, refundAmount: -0.1 },
-      { date: "2026-04-20", payWay: "微信支付", payCount: 2, payAmount: 1.4, refundCount: 0, refundAmount: 0 },
-      { date: "2026-04-21", payWay: "医保电子凭证", payCount: 12, payAmount: 8.1, refundCount: 2, refundAmount: -1 },
-      { date: "2026-04-21", payWay: "支付宝", payCount: 4, payAmount: 2.7, refundCount: 1, refundAmount: -0.5 },
-    ],
-    store: [
-      { storeNo: "LPK001", store: "月头礼品卡", storeType: "直营店", payWay: "银联刷卡h", payCount: 12, payAmount: 8.4, refundCount: 4, refundAmount: -2.2 },
-      { storeNo: "LPK001", store: "月头礼品卡", storeType: "直营店", payWay: "微信支付", payCount: 3, payAmount: 2.1, refundCount: 1, refundAmount: -0.4 },
-      { storeNo: "LPK002", store: "康宁路药房", storeType: "直营店", payWay: "医保电子凭证", payCount: 8, payAmount: 6.2, refundCount: 1, refundAmount: -0.1 },
-      { storeNo: "LPK003", store: "长宁医保店", storeType: "加盟店", payWay: "支付宝", payCount: 5, payAmount: 4.8, refundCount: 1, refundAmount: -1 },
-    ],
+    group: buildGroupSalesRows(),
+    daily: buildDailySalesRows(30),
+    store: buildStoreSalesRows(30),
   };
   return `
     <div class="sectioned-page">
       <div class="filter-panel">
         <div class="filter-grid">
-          <div class="field"><label>商户</label><select class="form-control"><option>博悠</option></select></div>
-          <div class="field"><label>片区</label><select class="form-control"><option>全部</option><option>上海片区</option><option>华东片区</option></select></div>
-          <div class="field"><label>门店</label><input class="form-control" placeholder="请选择" /></div>
-          <div class="field"><label>订单日期</label><input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" /></div>
+          ${filterFields
+            .map((field) => {
+              if (field.type === "select") {
+                return `<div class="field"><label>${field.label}</label><select class="form-control">${field.options.map((option) => `<option>${option}</option>`).join("")}</select></div>`;
+              }
+              if (field.type === "storeSuggest") {
+                return renderStoreSuggestField(field);
+              }
+              if (field.type === "dateRange") {
+                return `<div class="field"><label>${field.label}</label><input class="form-control date-range-control" value="${field.value}" /></div>`;
+              }
+              return `<div class="field"><label>${field.label}</label><input class="form-control" placeholder="${field.placeholder || ""}" /></div>`;
+            })
+            .join("")}
           <div class="actions">
-            <span class="subtle">${titleMap[type]}</span>
             <button class="btn text" data-action="reset-filter">重置</button>
             <button class="btn primary" data-action="query">查询</button>
             <button class="btn" data-action="download">导出</button>
@@ -1601,12 +1828,39 @@ function renderSalesReport(type) {
 }
 
 function reconcileRows() {
-  return [
-    { date: "2026-04-01", merchant: "博悠", storeType: "直营店", payWay: "银联刷卡h", tradeCount: 6, tradeAmount: 5.3, refundCount: 3, refundAmount: -1, merchantCoupon: 0, channelCoupon: 0, prepaidCoupon: 0, freeCoupon: 0, diff: 0, actual: 4.3, fee: 0, settle: 4.3 },
-    { date: "2026-04-01", merchant: "博悠", storeType: "直营店", payWay: "微信支付", tradeCount: 4, tradeAmount: 2.4, refundCount: 1, refundAmount: -0.3, merchantCoupon: 0, channelCoupon: 0, prepaidCoupon: 0, freeCoupon: 0, diff: 0, actual: 2.1, fee: 0, settle: 2.1 },
-    { date: "2026-04-02", merchant: "博悠", storeType: "直营店", payWay: "银联刷卡h", tradeCount: 9, tradeAmount: 5.1, refundCount: 2, refundAmount: -0.2, merchantCoupon: 0, channelCoupon: 0, prepaidCoupon: 0, freeCoupon: 0, diff: 0, actual: 4.9, fee: 0, settle: 4.9 },
-    { date: "2026-04-03", merchant: "博悠", storeType: "加盟店", payWay: "医保电子凭证", tradeCount: 7, tradeAmount: 1.6, refundCount: 8, refundAmount: -1.5, merchantCoupon: 0, channelCoupon: 0, prepaidCoupon: 0, freeCoupon: 0, diff: 0, actual: 0.1, fee: 0, settle: 0.1 },
-  ];
+  const storeTypes = ["直营店", "直营店", "加盟店"];
+  return Array.from({ length: 30 }, (_, index) => {
+    const payWay = reportPayWays[index % reportPayWays.length];
+    const payWayIndex = reportPayWays.indexOf(payWay);
+    const metric = reportMetric(index + 1, payWayIndex, 0.8 + (index % 5) * 0.16);
+    const refundCount = index % 5 === 0 ? 2 : index % 3 === 0 ? 1 : metric.refundCount;
+    const refundAmount = roundMoney(refundCount * (5.2 + payWayIndex * 1.1) * -1);
+    const merchantCoupon = roundMoney((index % 3) * 0.12);
+    const channelCoupon = roundMoney((index % 4) * 0.08);
+    const prepaidCoupon = roundMoney(index % 5 === 0 ? 0.2 : 0);
+    const freeCoupon = roundMoney(index % 7 === 0 ? 0.15 : 0);
+    const diff = roundMoney(index % 9 === 0 ? -0.05 : 0);
+    const actual = roundMoney(metric.payAmount + refundAmount - merchantCoupon - prepaidCoupon - freeCoupon + diff);
+    const settle = roundMoney(actual - metric.fee);
+    return {
+      date: `2026-04-${String((index % 30) + 1).padStart(2, "0")}`,
+      merchant: "博悠",
+      storeType: storeTypes[index % storeTypes.length],
+      payWay,
+      tradeCount: metric.payCount,
+      tradeAmount: metric.payAmount,
+      refundCount,
+      refundAmount,
+      merchantCoupon,
+      channelCoupon,
+      prepaidCoupon,
+      freeCoupon,
+      diff,
+      actual,
+      fee: metric.fee,
+      settle,
+    };
+  });
 }
 
 function reconcileMetricColumns() {
@@ -1617,6 +1871,8 @@ function reconcileMetricColumns() {
     { title: "退款金额", key: "refundAmount", amount: true },
     { title: "商户优惠", key: "merchantCoupon", amount: true },
     { title: "支付渠道优惠", key: "channelCoupon", amount: true },
+    { title: "商户预充值优惠", key: "prepaidCoupon", amount: true },
+    { title: "商户免充值优惠", key: "freeCoupon", amount: true },
     { title: "调差金额", key: "diff", amount: true },
     { title: "实收金额", key: "actual", amount: true },
     { title: "渠道手续费", key: "fee", amount: true },
@@ -1634,77 +1890,48 @@ function sumReconcileRows(rows, base = {}) {
       refundAmount: total.refundAmount + row.refundAmount,
       merchantCoupon: total.merchantCoupon + row.merchantCoupon,
       channelCoupon: total.channelCoupon + row.channelCoupon,
+      prepaidCoupon: total.prepaidCoupon + row.prepaidCoupon,
+      freeCoupon: total.freeCoupon + row.freeCoupon,
       diff: total.diff + row.diff,
       actual: total.actual + row.actual,
       fee: total.fee + row.fee,
       settle: total.settle + row.settle,
     }),
-    { tradeCount: 0, tradeAmount: 0, refundCount: 0, refundAmount: 0, merchantCoupon: 0, channelCoupon: 0, diff: 0, actual: 0, fee: 0, settle: 0, ...base }
+    { tradeCount: 0, tradeAmount: 0, refundCount: 0, refundAmount: 0, merchantCoupon: 0, channelCoupon: 0, prepaidCoupon: 0, freeCoupon: 0, diff: 0, actual: 0, fee: 0, settle: 0, ...base }
   );
 }
 
-function summarizeReconcileByPayWay(rows, includeTotal = true) {
-  const grouped = new Map();
-  rows.forEach((row) => {
-    if (!grouped.has(row.payWay)) grouped.set(row.payWay, []);
-    grouped.get(row.payWay).push(row);
-  });
-  const payWayRows = Array.from(grouped.entries()).map(([payWay, items]) => sumReconcileRows(items, { payWay }));
-  return includeTotal ? [...payWayRows, sumReconcileRows(rows, { payWay: "合计" })] : payWayRows;
-}
-
-function summarizeReconcileDetailRows(rows) {
-  const grouped = new Map();
-  rows.forEach((row) => {
-    const key = `${row.date}|${row.merchant}|${row.storeType}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(row);
-  });
-  return Array.from(grouped.entries()).map(([key, items]) => {
-    const [date, merchant, storeType] = key.split("|");
-    return sumReconcileRows(items, { date, merchant, storeType, reconcileKey: key });
-  });
-}
-
 function renderMerchantReconcileResults(rows) {
-  const summaryColumns = [{ title: "支付方式", key: "payWay" }, ...reconcileMetricColumns()];
+  const columns = [{ title: "日期", key: "date" }, { title: "商户", key: "merchant" }, { title: "门店类型", key: "storeType" }, { title: "支付方式", key: "payWay" }, ...reconcileMetricColumns()];
+  const summary = sumReconcileRows(rows);
   return `
-    ${renderResultSection("汇总结果（统计范围 商户：博悠 / 日期范围：2026-04-01 至 2026-04-22 / 支付方式：全部）", renderPlainTable(summaryColumns, summarizeReconcileByPayWay(rows), { className: "summary-result-table compact-table" }))}
-    ${renderResultSection("明细结果", renderMerchantReconcileDetailTable(rows))}`;
+    <section class="result-section grouped-report-result-section">
+      ${renderMerchantReconcileTable(columns, rows, summary)}
+      <div class="summary-bar">
+        <div>共<b>${rows.length}</b>条</div>
+        <div class="pager"><button class="page-num active">1</button><button class="page-num">2</button><button class="btn small">下一页</button><span>10 条/页</span></div>
+      </div>
+    </section>`;
 }
 
-function renderMerchantReconcileDetailTable(rows) {
-  const detailRows = summarizeReconcileDetailRows(rows);
-  const columns = [{ title: "日期", key: "date" }, { title: "商户", key: "merchant" }, { title: "门店类型", key: "storeType" }, ...reconcileMetricColumns()];
+function renderMerchantReconcileTable(columns, rows, summary) {
+  const reconcileCellClass = (column) => `${columnClass(column)} ${column.key === "date" ? "merchant-reconcile-date-col" : ""}`;
+  const renderReconcileBodyCell = (column, row) => `<td class="${reconcileCellClass(column)}">${renderCell(column, row, 0)}</td>`;
   return `
-    <div class="table-wrap">
-      <table class="compact-table">
+    <div class="table-wrap grouped-stat-table-wrap merchant-reconcile-table-wrap">
+      <table class="compact-table flat-stat-table merchant-reconcile-table">
         <thead>
-          <tr>${columns.map((column) => `<th class="${columnClass(column)}">${column.title}</th>`).join("")}<th class="action-cell">操作</th></tr>
+          <tr>${columns.map((column) => `<th class="${reconcileCellClass(column)}">${column.title}</th>`).join("")}</tr>
         </thead>
         <tbody>
-          ${detailRows
-            .map((row) => {
-              const expanded = !!state.expandedReconcileRows[row.reconcileKey];
-              const drillRows = summarizeReconcileByPayWay(rows.filter((item) => `${item.date}|${item.merchant}|${item.storeType}` === row.reconcileKey), false);
-              return `
-                <tr>
-                  ${columns.map((column) => `<td class="${columnClass(column)}">${renderCell(column, row, 0)}</td>`).join("")}
-                  <td class="action-cell"><button class="btn link" data-action="toggle-reconcile-row" data-key="${row.reconcileKey}">${expanded ? "收起" : "展开"}</button></td>
-                </tr>
-                ${
-                  expanded
-                    ? `<tr class="drilldown-row"><td colspan="${columns.length + 1}">${renderPlainTable([{ title: "支付方式", key: "payWay" }, ...reconcileMetricColumns()], drillRows, { className: "nested-table compact-table" })}</td></tr>`
-                    : ""
-                }`;
-            })
-            .join("")}
+          ${rows.map((row) => `<tr>${columns.map((column) => renderReconcileBodyCell(column, row)).join("")}</tr>`).join("")}
+          <tr class="total-row">
+            <td class="merchant-reconcile-date-col">汇总</td>
+            <td colspan="3"></td>
+            ${reconcileMetricColumns().map((column) => `<td class="${columnClass(column)}">${renderCell(column, summary, 0)}</td>`).join("")}
+          </tr>
         </tbody>
       </table>
-    </div>
-    <div class="summary-bar">
-      <div>共<b>${detailRows.length}</b>条</div>
-      <div class="pager"><button class="page-num active">1</button><button class="page-num">2</button><button class="btn small">下一页</button><span>10 条/页</span></div>
     </div>`;
 }
 
@@ -1716,9 +1943,8 @@ function renderMerchantReconcile() {
         <div class="filter-grid cols-3">
           <div class="field"><label>商户</label><select class="form-control"><option>博悠</option></select></div>
           <div class="field"><label>日期</label><input class="form-control date-range-control" value="2026-04-01 至 2026-04-22" /></div>
-          <div class="field"><label>支付方式</label><select class="form-control"><option>全部</option><option>银联刷卡h</option><option>微信支付</option><option>医保电子凭证</option></select></div>
+          <div class="field"><label>支付方式</label><select class="form-control"><option>全部</option><option>银联刷卡h</option><option>微信支付</option><option>医保电子凭证</option><option>支付宝</option></select></div>
           <div class="actions">
-            <span class="subtle">基于倍赞销售数据与交易渠道侧数据对账后生成。</span>
             <button class="btn text" data-action="reset-filter">重置</button>
             <button class="btn primary" data-action="query">查询</button>
             <button class="btn" data-action="download">导出</button>
@@ -1727,6 +1953,28 @@ function renderMerchantReconcile() {
       </div>
       ${renderMerchantReconcileResults(rows)}
     </div>`;
+}
+
+function closeStoreSuggestPanels(exceptField = null) {
+  app.querySelectorAll("[data-store-suggest]").forEach((field) => {
+    if (field !== exceptField) field.classList.remove("open");
+  });
+}
+
+function updateStoreSuggestPanel(input) {
+  const field = input.closest("[data-store-suggest]");
+  if (!field) return;
+  const query = input.value.trim().toLowerCase();
+  let matched = 0;
+  field.querySelectorAll(".store-suggest-option").forEach((option) => {
+    const visible = !query || option.dataset.search.includes(query);
+    option.hidden = !visible;
+    if (visible) matched += 1;
+  });
+  const empty = field.querySelector("[data-store-suggest-empty]");
+  if (empty) empty.hidden = matched > 0;
+  closeStoreSuggestPanels(field);
+  field.classList.add("open");
 }
 
 function renderOperatorManage() {
@@ -1859,6 +2107,14 @@ function showRoleForm(id) {
 
 function bindEvents() {
   app.onclick = (event) => {
+    const suggestInput = event.target.closest("[data-store-suggest-input]");
+    if (suggestInput) {
+      updateStoreSuggestPanel(suggestInput);
+      return;
+    }
+    if (!event.target.closest("[data-store-suggest]")) {
+      closeStoreSuggestPanels();
+    }
     const target = event.target.closest("button");
     if (!target) return;
     const action = target.dataset.action;
@@ -1918,25 +2174,22 @@ function bindEvents() {
       render();
       return;
     }
+    if (action === "open-export-records") {
+      state.userMenuOpen = false;
+      showExportRecords();
+      return;
+    }
     if (action === "query") toast("查询完成，已加载示例数据");
     if (action === "reset-filter") toast("已清空查询条件", "warn");
-    if (action === "download") toast("已生成下载任务");
-    if (action === "toggle-store-summary-date") {
-      const date = target.dataset.date;
-      state.expandedStoreSummaryDates[date] = !state.expandedStoreSummaryDates[date];
-      render({ preserveContentScroll: true });
+    if (action === "download") {
+      requestAsyncExport();
       return;
     }
-    if (action === "toggle-sales-report-row") {
-      const key = `${target.dataset.report}:${target.dataset.key}`;
-      state.expandedSalesReportRows[key] = !state.expandedSalesReportRows[key];
-      render({ preserveContentScroll: true });
-      return;
-    }
-    if (action === "toggle-reconcile-row") {
-      const key = target.dataset.key;
-      state.expandedReconcileRows[key] = !state.expandedReconcileRows[key];
-      render({ preserveContentScroll: true });
+    if (action === "store-suggest-select") {
+      const field = target.closest("[data-store-suggest]");
+      const input = field?.querySelector("[data-store-suggest-input]");
+      if (input) input.value = target.dataset.value || "";
+      closeStoreSuggestPanels();
       return;
     }
     if (action === "order-detail") {
@@ -2022,7 +2275,25 @@ function bindEvents() {
     updateInsurancePrice(target.dataset.code, target.value);
   };
 
+  app.oninput = (event) => {
+    const suggestInput = event.target.closest("[data-store-suggest-input]");
+    if (!suggestInput) return;
+    updateStoreSuggestPanel(suggestInput);
+  };
+
+  app.onfocusin = (event) => {
+    const suggestInput = event.target.closest("[data-store-suggest-input]");
+    if (!suggestInput) return;
+    updateStoreSuggestPanel(suggestInput);
+  };
+
   app.onkeydown = (event) => {
+    const suggestInput = event.target.closest("[data-store-suggest-input]");
+    if (suggestInput && event.key === "Escape") {
+      closeStoreSuggestPanels();
+      suggestInput.blur();
+      return;
+    }
     const target = event.target.closest("[data-action='insurance-price']");
     if (!target || event.key !== "Enter") return;
     event.preventDefault();
@@ -2047,7 +2318,7 @@ function bindEvents() {
         toast("请输入客户编号", "warn");
         return;
       }
-      state.customerCode = customerCode;
+      state.customerCode = customerProfile.code;
       state.loginStep = "enterprise-entry";
       render();
       return;
@@ -2078,6 +2349,8 @@ function bindEvents() {
     if (target.dataset.action === "insurance-paid") completeInsurancePayment();
     if (target.dataset.action === "save-operator") saveOperator(target.dataset.user);
     if (target.dataset.action === "save-role") saveRole(target.dataset.role);
+    if (target.dataset.action === "open-export-records") showExportRecords();
+    if (target.dataset.action === "download-export-record") toast("文件已开始下载");
   };
 
   document.onkeydown = (event) => {
