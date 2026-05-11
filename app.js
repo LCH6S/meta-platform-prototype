@@ -89,9 +89,9 @@ const orders = [
     platformNo: "S6344069",
     amount: 1,
     type: "收款",
-    status: "支付成功",
+    status: "支付中",
     payWay: "银联刷卡h",
-    success: true,
+    success: false,
     refundable: 0,
     products: [{ code: "YP003", name: "医用退热贴", approval: "-", category: "器械", spec: "4贴/盒", unit: "盒", price: 1, qty: 1 }],
     payDetail: { channelFlow: "7903247986919220", channelOrder: "无" },
@@ -108,9 +108,9 @@ const orders = [
     platformNo: "S6218377",
     amount: -0.1,
     type: "退款",
-    status: "退款成功",
+    status: "退款中",
     payWay: "银联刷卡h",
-    success: true,
+    success: false,
     refundable: 0,
     products: [{ code: "YP004", name: "葡萄糖酸钙口服液", approval: "国药准字H33021939", category: "OTC", spec: "10ml*12支", unit: "盒", price: 0.1, qty: 1 }],
     payDetail: { channelFlow: "7903247986686896", channelOrder: "R20260420153922" },
@@ -286,7 +286,7 @@ function escapeHtml(value) {
 function getStatusClass(value) {
   const text = String(value);
   if (text.includes("失败") || value === "停用") return "danger";
-  if (text.includes("审核中") || text.includes("退款中") || text.includes("待")) return "warning";
+  if (text.includes("审核中") || text.includes("支付中") || text.includes("退款中") || text.includes("待")) return "warning";
   if (text.includes("成功") || value === "启用" || value === "正常") return "success";
   return "";
 }
@@ -886,11 +886,33 @@ function orderColumns(showActions = true) {
           {
             title: "操作",
             action: true,
-            render: (row) => `<button class="btn link" data-action="order-detail" data-order="${row.orderNo}">详情</button>`,
+            render: (row) => {
+              const refreshButton = isRefreshingOrder(row) ? ` <button class="btn link" data-action="refresh-order-status" data-order="${row.orderNo}">刷新</button>` : "";
+              return `<button class="btn link" data-action="order-detail" data-order="${row.orderNo}">详情</button>${refreshButton}`;
+            },
           },
         ]
       : []),
   ];
+}
+
+function isRefreshingOrder(order) {
+  return ["支付中", "退款中"].includes(order.status);
+}
+
+function resolveOrderStatusAfterRefresh(order) {
+  if (order.status === "支付中") return "支付成功";
+  if (order.status === "退款中") return "退款成功";
+  return order.status;
+}
+
+function refreshOrderStatus(orderNo) {
+  const order = orders.find((item) => item.orderNo === orderNo);
+  if (!order || !isRefreshingOrder(order)) return;
+  order.status = resolveOrderStatusAfterRefresh(order);
+  order.success = true;
+  render();
+  toast(`交易状态已更新为${order.status}`);
 }
 
 function renderOrderSearch() {
@@ -2194,6 +2216,10 @@ function bindEvents() {
     }
     if (action === "order-detail") {
       openOrderDetail(target.dataset.order, "", "交易管理", "订单查询");
+      return;
+    }
+    if (action === "refresh-order-status") {
+      refreshOrderStatus(target.dataset.order);
       return;
     }
     if (action === "refund-detail") {
