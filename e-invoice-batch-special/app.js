@@ -162,9 +162,9 @@ const specialInfo = {
   ],
   JEWELRY: [["子业务类型", "零售"]],
   REFINED_OIL: [
-    ["交易站点", "上海徐汇漕溪北路站"],
+    ["加油站点", "上海徐汇漕溪北路站"],
+    ["交易时间", "2026-05-13 10:35:21"],
     ["油枪号", "06"],
-    ["油品号", "92#汽油"],
   ],
 };
 
@@ -391,12 +391,11 @@ function renderCheckStep(task) {
   return `
     <div class="upload-layout" style="max-width:980px">
       ${hasError ? `
-        <div class="alert error">检查失败：第 3 行油枪号为空；第 4 行税收分类编码不属于成品油范围。请修改文件后重新上传。</div>
+        <div class="alert error">检查失败：第 4 行税收分类编码不属于成品油范围。请修改文件后重新上传。</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>行号</th><th>字段</th><th>问题</th><th>处理建议</th></tr></thead>
             <tbody>
-              <tr><td>3</td><td>油枪号</td><td>成品油特定业务必填</td><td>补充油枪号后重新上传</td></tr>
               <tr><td>4</td><td>税收分类编码</td><td>编码不属于成品油允许范围</td><td>更换成品油税收分类编码或重新创建任务</td></tr>
             </tbody>
           </table>
@@ -705,7 +704,7 @@ function openCreateModal() {
 function businessDesc(type) {
   if (type === "REAL_ESTATE_LEASE") return "租赁地址、租赁期等";
   if (type === "JEWELRY") return "零售/批发/个人场景";
-  return "站点、油枪、油品号";
+  return "加油站点、交易时间、油枪号";
 }
 
 function closeModal() {
