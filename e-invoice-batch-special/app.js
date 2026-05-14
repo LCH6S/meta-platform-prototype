@@ -180,6 +180,10 @@ function businessLabel(type) {
   return BUSINESS_TYPES[type] || "不涉及";
 }
 
+function taskListBusinessLabel(type) {
+  return type === "NONE" ? "--" : businessLabel(type);
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -285,7 +289,7 @@ function renderTaskList() {
               <tr>
                 <td>${task.createTime}</td>
                 <td>${task.taskType}</td>
-                <td><span class="tag ${task.businessType === "NONE" ? "" : "special"}">${businessLabel(task.businessType)}</span></td>
+                <td>${task.businessType === "NONE" ? taskListBusinessLabel(task.businessType) : `<span class="tag special">${taskListBusinessLabel(task.businessType)}</span>`}</td>
                 <td>${task.desc}</td>
                 <td>${task.imported}</td>
                 <td>${task.pending}</td>
