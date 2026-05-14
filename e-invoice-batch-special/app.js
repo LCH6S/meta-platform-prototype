@@ -680,16 +680,13 @@ function openCreateModal() {
             <textarea id="task-desc">2026年05月13日批量开具蓝字发票</textarea>
           </div>
           <div class="field">
-            <label>特定业务选择 <span class="hint">选填，仅涉及特定业务时选择</span></label>
-            <div class="radio-grid">
+            <label>特定业务类型</label>
+            <select data-action="modal-business-type">
+              <option value="">仅在开具特定业务发票时需选择</option>
               ${["REAL_ESTATE_LEASE", "JEWELRY", "REFINED_OIL"].map((type) => `
-                <label class="radio-card" data-radio-card="${type}">
-                  <input type="radio" name="businessType" value="${type}" />
-                  <span><strong>${businessLabel(type)}</strong><br /><span class="hint">${businessDesc(type)}</span></span>
-                </label>
+                <option value="${type}">${businessLabel(type)}</option>
               `).join("")}
-            </div>
-            <p class="hint">不涉及特定业务时无需选择；系统会在列表中展示为“不涉及”。</p>
+            </select>
           </div>
         </div>
         <div class="modal-footer">
@@ -699,12 +696,6 @@ function openCreateModal() {
       </div>
     </div>
   `;
-}
-
-function businessDesc(type) {
-  if (type === "REAL_ESTATE_LEASE") return "租赁地址、租赁期等";
-  if (type === "JEWELRY") return "零售/批发/个人场景";
-  return "加油站点、交易时间、油枪号";
 }
 
 function closeModal() {
@@ -719,7 +710,7 @@ function toast(message) {
 }
 
 document.addEventListener("click", (event) => {
-  const target = event.target.closest("[data-action], [data-close-modal], [data-nav], [data-radio-card]");
+  const target = event.target.closest("[data-action], [data-close-modal], [data-nav]");
   if (!target) return;
 
   if (target.dataset.closeModal !== undefined) {
@@ -731,14 +722,6 @@ document.addEventListener("click", (event) => {
     render();
     return;
   }
-  if (target.dataset.radioCard) {
-    modalRoot.querySelectorAll(".radio-card").forEach((card) => card.classList.remove("active"));
-    target.classList.add("active");
-    target.querySelector("input").checked = true;
-    state.modalBusinessType = target.dataset.radioCard;
-    return;
-  }
-
   const action = target.dataset.action;
   if (action === "open-create") openCreateModal();
   if (action === "create-task") {
@@ -841,6 +824,9 @@ document.addEventListener("change", (event) => {
   if (target.dataset.action === "filter-business") {
     state.filterType = target.value;
     render();
+  }
+  if (target.dataset.action === "modal-business-type") {
+    state.modalBusinessType = target.value;
   }
 });
 
