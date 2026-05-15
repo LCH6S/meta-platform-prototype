@@ -424,7 +424,10 @@ function renderUploadStep(task) {
       <div class="upload-card">
         <div>1. 下载导入模板，并根据模板提示完善内容</div>
         <div class="template-selector">
-          <div class="hint">如包含特定业务发票，请选择相应特定业务类型</div>
+          <div class="template-line">
+            <button class="btn">▣ ${templateDownloadButtonLabel()}</button>
+          </div>
+          <div class="hint">如需一并开具特定业务发票，请选择相应特定业务类型</div>
           <div class="template-options">
             ${TEMPLATE_BUSINESS_TYPES.map((type) => `
               <label class="template-option">
@@ -432,11 +435,6 @@ function renderUploadStep(task) {
                 <span>${businessLabel(type)}</span>
               </label>
             `).join("")}
-          </div>
-          <div class="hint">选择仅影响下载模板内容，不限制后续上传文件</div>
-          <div class="template-line">
-            <button class="btn">▣ ${templateDownloadButtonLabel()}</button>
-            <span class="hint">基础列 A-Z 固定，所选特定业务要素列追加在 Z 列之后</span>
           </div>
         </div>
       </div>
@@ -463,13 +461,13 @@ function renderCheckStep(task) {
   return `
     <div class="upload-layout" style="max-width:980px">
       ${hasError ? `
-        <div class="alert error">检查失败：识别到特定业务发票，但模板缺少必填特定业务要素。请补齐对应表头和值后重新上传。</div>
+        <div class="alert error">检查失败：文件中存在同一发票序号内混开普通业务和特定业务，或缺少必填特定业务要素。请按失败明细调整后重新上传。</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>行号</th><th>识别业务类型</th><th>缺失字段</th><th>处理建议</th></tr></thead>
+            <thead><tr><th>序号</th><th>行号</th><th>失败类型</th><th>识别结果</th><th>处理建议</th></tr></thead>
             <tbody>
-              <tr><td>4</td><td>不动产经营租赁</td><td>不动产地址、租赁期起、租赁期止</td><td>补充对应表头和值后重新上传</td></tr>
-              <tr><td>7</td><td>金银首饰</td><td>子业务类型</td><td>企业购方需填写零售或批发</td></tr>
+              <tr><td>2</td><td>4、5</td><td>同票混开</td><td>普通业务 + 不动产经营租赁</td><td>同一 A 列序号内不得混开普通和特定业务，请拆分为不同序号</td></tr>
+              <tr><td>3</td><td>7</td><td>必填要素缺失</td><td>金银首饰：子业务类型为空</td><td>企业购方需填写零售或批发</td></tr>
             </tbody>
           </table>
         </div>
@@ -480,7 +478,8 @@ function renderCheckStep(task) {
           <table>
             <thead><tr><th>检查项</th><th>结果</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>行级税编识别</td><td>通过</td><td>普通业务和多类特定业务可在同一模板内混合</td></tr>
+              <tr><td>行级税编识别</td><td>通过</td><td>普通业务和多类特定业务可在同一模板内跨不同序号混合</td></tr>
+              <tr><td>同票混开校验</td><td>通过</td><td>同一 A 列序号内未混开普通业务和不同特定业务类型</td></tr>
               <tr><td>表头名称读取</td><td>通过</td><td>特定业务要素按表头名称定位，不依赖固定列序</td></tr>
               <tr><td>必填特定要素</td><td>通过</td><td>不动产经营租赁和金银首饰必填要素已填写</td></tr>
               <tr><td>成品油选填字段</td><td>通过</td><td>加油站点、交易时间、油枪号为空不阻断</td></tr>
@@ -663,7 +662,6 @@ function renderSpecialSection(type) {
           </div>
         `).join("")}
       </div>
-      <p class="hint">这些字段最终会参与特定业务要素传参，并在发票备注中承接展示；不需要手工拼接到普通备注文本中。</p>
     </div>
   `;
 }
@@ -685,6 +683,8 @@ function renderProcessedRemark(item) {
 
 function renderInvoiceDetail() {
   const item = currentApplication();
+  const type = item.businessType;
+  const special = type !== "NONE";
   const redInvoice = item.invoiceType.includes("红字");
   return `
     <div class="breadcrumb">⌂ / 批量开票 / 任务详情 / <strong>开票任务</strong></div>
@@ -696,6 +696,7 @@ function renderInvoiceDetail() {
           <div><div class="summary-label">序号</div><div class="summary-value">1</div></div>
           <div><div class="summary-label">价税合计</div><div class="summary-value">${item.amount}</div></div>
           <div><div class="summary-label">发票类型</div><div class="summary-value">${item.invoiceType}</div></div>
+          ${special ? `<div><div class="summary-label">特定业务类型</div><div class="summary-value">${businessLabel(type)}</div></div>` : ""}
         </div>
       </div>
       <div class="status-box"><div class="status-title" style="color:#38a01d">${item.invoiceStatus}</div></div>
