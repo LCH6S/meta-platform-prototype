@@ -3,31 +3,30 @@ const modalRoot = document.querySelector("#modal-root");
 const toastRoot = document.querySelector("#toast-root");
 
 const BUSINESS_TYPES = {
-  NONE: "不涉及",
-  REAL_ESTATE_LEASE: "不动产租赁",
+  REAL_ESTATE_LEASE: "不动产经营租赁",
   JEWELRY: "金银首饰",
   REFINED_OIL: "成品油",
 };
 
+const TEMPLATE_BUSINESS_TYPES = ["REAL_ESTATE_LEASE", "JEWELRY", "REFINED_OIL"];
+
 const state = {
   view: "list",
-  filterType: "ALL",
   taskTab: "pending",
   processedSubtab: "ALL",
   currentTaskId: "186247790353",
   currentApplicationId: "99001",
-  modalBusinessType: "",
+  templateBusinessTypes: [],
 };
 
 const tasks = [
   {
     id: "186247790353",
-    createTime: "2026-05-12 09:57:13",
+    createTime: "2026-05-15 09:57:13",
     taskType: "批量开具蓝字发票",
-    businessType: "REAL_ESTATE_LEASE",
-    desc: "2026年05月12日不动产租赁批量开票",
-    imported: 3,
-    pending: 2,
+    desc: "2026年05月15日混合业务批量开票",
+    imported: 5,
+    pending: 4,
     voided: 0,
     processed: 1,
     success: 1,
@@ -41,7 +40,6 @@ const tasks = [
     id: "186247733760",
     createTime: "2025-12-16 15:09:52",
     taskType: "批量开具蓝字发票",
-    businessType: "NONE",
     desc: "2025年12月16日批量开票-2",
     imported: 9,
     pending: 0,
@@ -55,44 +53,9 @@ const tasks = [
     step: "done",
   },
   {
-    id: "186247805118",
-    createTime: "2026-05-13 10:21:08",
-    taskType: "批量开具蓝字发票",
-    businessType: "JEWELRY",
-    desc: "2026年05月13日金银首饰批量开票",
-    imported: 3,
-    pending: 2,
-    voided: 0,
-    processed: 1,
-    success: 1,
-    failed: 0,
-    processing: 0,
-    status: "处理中",
-    creator: "集团老一",
-    step: "done",
-  },
-  {
-    id: "186247805299",
-    createTime: "2026-05-13 11:08:41",
-    taskType: "批量开具蓝字发票",
-    businessType: "REFINED_OIL",
-    desc: "2026年05月13日成品油批量开票",
-    imported: 3,
-    pending: 2,
-    voided: 0,
-    processed: 1,
-    success: 1,
-    failed: 0,
-    processing: 0,
-    status: "处理中",
-    creator: "集团老一",
-    step: "done",
-  },
-  {
     id: "186247806012",
     createTime: "2026-05-13 15:18:26",
     taskType: "批量开具红字发票",
-    businessType: "NONE",
     desc: "2026年05月13日批量开具红字发票",
     imported: 2,
     pending: 1,
@@ -135,6 +98,48 @@ const applications = [
     invoiceNo: "-",
     invoiceStatus: "-",
     businessType: "REAL_ESTATE_LEASE",
+  },
+  {
+    id: "99021",
+    taskId: "186247790353",
+    status: "待处理",
+    amount: "¥12,800.00",
+    invoiceType: "专票",
+    buyer: "上海锦悦珠宝有限公司",
+    buyerTaxNo: "91310000MA1K88JY2X",
+    seller: "上海收钱吧科技有限公司",
+    sellerTaxNo: "9131000066935277XR",
+    invoiceNo: "-",
+    invoiceStatus: "-",
+    businessType: "JEWELRY",
+  },
+  {
+    id: "99031",
+    taskId: "186247790353",
+    status: "待处理",
+    amount: "¥3,200.00",
+    invoiceType: "专票",
+    buyer: "上海南站物流有限公司",
+    buyerTaxNo: "91310104MA1K33YY8Q",
+    seller: "博柏利（上海）贸易有限公司",
+    sellerTaxNo: "9131000066935277XR",
+    invoiceNo: "-",
+    invoiceStatus: "-",
+    businessType: "REFINED_OIL",
+  },
+  {
+    id: "99004",
+    taskId: "186247790353",
+    status: "待处理",
+    amount: "¥4,680.00",
+    invoiceType: "普票",
+    buyer: "张芳霞",
+    buyerTaxNo: "-",
+    seller: "博柏利（上海）贸易有限公司",
+    sellerTaxNo: "9131000066935277XR",
+    invoiceNo: "-",
+    invoiceStatus: "-",
+    businessType: "NONE",
   },
   {
     id: "99003",
@@ -206,90 +211,6 @@ const applications = [
     invoiceStatus: "红冲成功",
     businessType: "NONE",
   },
-  {
-    id: "99021",
-    taskId: "186247805118",
-    status: "待处理",
-    amount: "¥12,800.00",
-    invoiceType: "专票",
-    buyer: "上海锦悦珠宝有限公司",
-    buyerTaxNo: "91310000MA1K88JY2X",
-    seller: "上海收钱吧科技有限公司",
-    sellerTaxNo: "9131000066935277XR",
-    invoiceNo: "-",
-    invoiceStatus: "-",
-    businessType: "JEWELRY",
-  },
-  {
-    id: "99022",
-    taskId: "186247805118",
-    status: "待处理",
-    amount: "¥5,600.00",
-    invoiceType: "普票",
-    buyer: "杭州银辉商贸有限公司",
-    buyerTaxNo: "91330100MA2JY88888",
-    seller: "上海收钱吧科技有限公司",
-    sellerTaxNo: "9131000066935277XR",
-    invoiceNo: "-",
-    invoiceStatus: "-",
-    businessType: "JEWELRY",
-  },
-  {
-    id: "99023",
-    taskId: "186247805118",
-    status: "开票成功",
-    amount: "¥9,900.00",
-    invoiceType: "专票",
-    buyer: "苏州金瑞珠宝有限公司",
-    buyerTaxNo: "91320500MA1JR66666",
-    seller: "上海收钱吧科技有限公司",
-    sellerTaxNo: "9131000066935277XR",
-    invoiceNo: "2531200000041599023",
-    invoiceStatus: "开票成功",
-    businessType: "JEWELRY",
-  },
-  {
-    id: "99031",
-    taskId: "186247805299",
-    status: "待处理",
-    amount: "¥3,200.00",
-    invoiceType: "专票",
-    buyer: "上海南站物流有限公司",
-    buyerTaxNo: "91310104MA1K33YY8Q",
-    seller: "上海收钱吧科技有限公司",
-    sellerTaxNo: "9131000066935277XR",
-    invoiceNo: "-",
-    invoiceStatus: "-",
-    businessType: "REFINED_OIL",
-  },
-  {
-    id: "99032",
-    taskId: "186247805299",
-    status: "待处理",
-    amount: "¥1,860.00",
-    invoiceType: "普票",
-    buyer: "南京迅捷运输有限公司",
-    buyerTaxNo: "91320115MA1N88888H",
-    seller: "上海收钱吧科技有限公司",
-    sellerTaxNo: "9131000066935277XR",
-    invoiceNo: "-",
-    invoiceStatus: "-",
-    businessType: "REFINED_OIL",
-  },
-  {
-    id: "99033",
-    taskId: "186247805299",
-    status: "开票成功",
-    amount: "¥2,450.00",
-    invoiceType: "专票",
-    buyer: "上海城配供应链有限公司",
-    buyerTaxNo: "91310120MA1HY77777",
-    seller: "上海收钱吧科技有限公司",
-    sellerTaxNo: "9131000066935277XR",
-    invoiceNo: "2531200000041599033",
-    invoiceStatus: "开票成功",
-    businessType: "REFINED_OIL",
-  },
 ];
 
 const specialInfo = {
@@ -320,11 +241,20 @@ function currentApplication() {
 }
 
 function businessLabel(type) {
-  return BUSINESS_TYPES[type] || "不涉及";
+  return BUSINESS_TYPES[type] || "--";
 }
 
 function taskListBusinessLabel(type) {
-  return type === "NONE" ? "--" : businessLabel(type);
+  return businessLabel(type);
+}
+
+function templateDownloadButtonLabel() {
+  const selectedLabels = state.templateBusinessTypes.map((type) => businessLabel(type));
+  return selectedLabels.length ? `下载模板（含特定业务：${selectedLabels.join("、")}）` : "下载模板";
+}
+
+function isTemplateTypeSelected(type) {
+  return state.templateBusinessTypes.includes(type);
 }
 
 function escapeHtml(value) {
@@ -388,7 +318,7 @@ function renderPage() {
 }
 
 function renderTaskList() {
-  const rows = tasks.filter((task) => state.filterType === "ALL" || task.businessType === state.filterType);
+  const rows = tasks;
   return `
     <div class="page-header">
       <div>
@@ -402,18 +332,12 @@ function renderTaskList() {
     </div>
     <section class="panel">
       <h2 class="panel-title">任务列表</h2>
-      <div class="filter-grid">
+      <div class="filter-grid" style="grid-template-columns:repeat(3,minmax(180px,1fr)) 180px">
         <div class="field"><label>创建时间</label><input placeholder="" /></div>
         <div class="field"><label>任务描述</label><input placeholder="" /></div>
         <div class="field">
           <label>任务状态</label>
           <select><option>全部</option><option>待导入</option><option>处理中</option><option>处理完成</option></select>
-        </div>
-        <div class="field">
-          <label>特定业务类型</label>
-          <select data-action="filter-business">
-            ${["ALL", "NONE", "REAL_ESTATE_LEASE", "JEWELRY", "REFINED_OIL"].map((type) => `<option value="${type}" ${state.filterType === type ? "selected" : ""}>${type === "ALL" ? "全部" : businessLabel(type)}</option>`).join("")}
-          </select>
         </div>
         <div class="filter-actions">
           <button class="btn text" data-action="clear-filter">清空条件</button>
@@ -424,7 +348,7 @@ function renderTaskList() {
         <table>
           <thead>
             <tr>
-              <th>创建时间</th><th>任务类型</th><th>特定业务类型</th><th>任务描述</th><th>已导入</th><th>待处理</th><th>已作废</th><th>已处理</th><th>任务状态</th><th>任务号</th><th>创建人</th><th class="action-cell">操作</th>
+              <th>创建时间</th><th>任务类型</th><th>任务描述</th><th>已导入</th><th>待处理</th><th>已作废</th><th>已处理</th><th>任务状态</th><th>任务号</th><th>创建人</th><th class="action-cell">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -432,7 +356,6 @@ function renderTaskList() {
               <tr>
                 <td>${task.createTime}</td>
                 <td>${task.taskType}</td>
-                <td>${task.businessType === "NONE" ? taskListBusinessLabel(task.businessType) : `<span class="tag special">${taskListBusinessLabel(task.businessType)}</span>`}</td>
                 <td>${task.desc}</td>
                 <td>${task.imported}</td>
                 <td>${task.pending}</td>
@@ -462,11 +385,6 @@ function renderTaskDetail() {
 }
 
 function renderTaskSummary(task) {
-  const specialItem = task.businessType === "NONE" ? "" : `
-    <div>
-      <div class="summary-label">特定业务类型</div>
-      <div class="summary-value">${businessLabel(task.businessType)}</div>
-    </div>`;
   return `
     <section class="summary-card">
       <div>
@@ -477,7 +395,6 @@ function renderTaskSummary(task) {
           <div><div class="summary-label">任务号</div><div class="summary-value">${task.id}</div></div>
           <div><div class="summary-label">任务类型</div><div class="summary-value">${task.taskType}</div></div>
           <div><div class="summary-label">任务描述</div><div class="summary-value">${task.desc}</div></div>
-          ${specialItem}
         </div>
       </div>
       <div class="status-box">
@@ -502,17 +419,24 @@ function renderUploadFlow(task) {
 }
 
 function renderUploadStep(task) {
-  const type = businessLabel(task.businessType);
-  const templateHint = task.businessType === "NONE"
-    ? "下载导入模板，并根据模板提示完善内容"
-    : `下载${type}业务导入模板，并根据模板提示完善内容`;
   return `
     <div class="upload-layout">
       <div class="upload-card">
-        <div>1. ${templateHint}</div>
-        <div class="template-line">
-          <button class="btn">▣ 下载模板</button>
-          <span class="hint">${task.businessType === "NONE" ? "当前任务不涉及特定业务" : `模板仅包含${type}所需字段和可用税收分类编码`}</span>
+        <div>1. 下载导入模板，并根据模板提示完善内容</div>
+        <div class="template-selector">
+          <div class="hint">如包含特定业务发票，请选择相应特定业务类型</div>
+          <div class="template-options">
+            ${TEMPLATE_BUSINESS_TYPES.map((type) => `
+              <label class="template-option">
+                <input type="checkbox" data-action="template-business-toggle" value="${type}" ${isTemplateTypeSelected(type) ? "checked" : ""} />
+                <span>${businessLabel(type)}</span>
+              </label>
+            `).join("")}
+          </div>
+          <div class="template-line">
+            <button class="btn">▣ ${templateDownloadButtonLabel()}</button>
+            <span class="hint">基础列 A-Z 固定，所选特定业务要素列追加在 Z 列之后</span>
+          </div>
         </div>
       </div>
       <div class="upload-card">
@@ -534,29 +458,31 @@ function renderUploadStep(task) {
 }
 
 function renderCheckStep(task) {
-  const hasError = task.businessType === "REFINED_OIL";
+  const hasError = task.demoCheckResult === "missing-required";
   return `
     <div class="upload-layout" style="max-width:980px">
       ${hasError ? `
-        <div class="alert error">检查失败：第 4 行税收分类编码不属于成品油范围。请修改文件后重新上传。</div>
+        <div class="alert error">检查失败：识别到特定业务发票，但模板缺少必填特定业务要素。请补齐对应表头和值后重新上传。</div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>行号</th><th>字段</th><th>问题</th><th>处理建议</th></tr></thead>
+            <thead><tr><th>行号</th><th>识别业务类型</th><th>缺失字段</th><th>处理建议</th></tr></thead>
             <tbody>
-              <tr><td>4</td><td>税收分类编码</td><td>编码不属于成品油允许范围</td><td>更换成品油税收分类编码或重新创建任务</td></tr>
+              <tr><td>4</td><td>不动产经营租赁</td><td>不动产地址、租赁期起、租赁期止</td><td>补充对应表头和值后重新上传</td></tr>
+              <tr><td>7</td><td>金银首饰</td><td>子业务类型</td><td>企业购方需填写零售或批发</td></tr>
             </tbody>
           </table>
         </div>
         <div class="footer-actions"><button class="btn" data-action="back-upload" data-task="${task.id}">返回上传</button></div>
       ` : `
-        <div class="alert">检查通过：共识别 12 条开票申请，其中待处理 3 条，已处理 9 条。特定业务类型：${businessLabel(task.businessType)}。</div>
+        <div class="alert">检查通过：共识别 5 条开票申请，其中普通业务 1 条、不动产经营租赁 2 条、金银首饰 1 条、成品油 1 条。</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>检查项</th><th>结果</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>任务特定业务类型</td><td><span class="tag special">${businessLabel(task.businessType)}</span></td><td>文件内容与任务类型一致</td></tr>
-              <tr><td>税收分类编码范围</td><td>通过</td><td>均属于当前特定业务允许范围</td></tr>
-              <tr><td>特定业务字段</td><td>通过</td><td>已识别结构化特定业务信息</td></tr>
+              <tr><td>行级税编识别</td><td>通过</td><td>普通业务和多类特定业务可在同一模板内混合</td></tr>
+              <tr><td>表头名称读取</td><td>通过</td><td>特定业务要素按表头名称定位，不依赖固定列序</td></tr>
+              <tr><td>必填特定要素</td><td>通过</td><td>不动产经营租赁和金银首饰必填要素已填写</td></tr>
+              <tr><td>成品油选填字段</td><td>通过</td><td>加油站点、交易时间、油枪号为空不阻断</td></tr>
             </tbody>
           </table>
         </div>
@@ -632,6 +558,7 @@ function renderApplicationDetail() {
   const item = currentApplication();
   const type = item.businessType;
   const special = type !== "NONE";
+  const redInvoice = item.invoiceType.includes("红字");
   return `
     <div class="breadcrumb">⌂ / 批量开票 / 待开票申请详情</div>
     <section class="summary-card">
@@ -648,7 +575,7 @@ function renderApplicationDetail() {
       <div class="status-box"><div class="status-title">待处理</div></div>
     </section>
     <section class="invoice-shell">
-      <h2 class="invoice-title">电子发票（增值税专用发票）</h2>
+      <h2 class="invoice-title">电子发票（${item.invoiceType}）</h2>
       <div class="invoice-grid">
         <div class="buyer-box">
           <h3 class="box-title">购买方信息</h3>
@@ -691,7 +618,7 @@ function renderApplicationDetail() {
       </div>
       <div class="footer-actions">
         <button class="btn">作废</button>
-        <button class="btn primary" data-action="confirm-invoice" data-app="${item.id}">确认开票</button>
+        <button class="btn primary" data-action="confirm-invoice" data-app="${item.id}">${redInvoice ? "确认红冲" : "确认开票"}</button>
       </div>
     </section>
   `;
@@ -757,6 +684,7 @@ function renderProcessedRemark(item) {
 
 function renderInvoiceDetail() {
   const item = currentApplication();
+  const redInvoice = item.invoiceType.includes("红字");
   return `
     <div class="breadcrumb">⌂ / 批量开票 / 任务详情 / <strong>开票任务</strong></div>
     <section class="summary-card">
@@ -769,19 +697,19 @@ function renderInvoiceDetail() {
           <div><div class="summary-label">发票类型</div><div class="summary-value">${item.invoiceType}</div></div>
         </div>
       </div>
-      <div class="status-box"><div class="status-title" style="color:#38a01d">开票成功</div></div>
+      <div class="status-box"><div class="status-title" style="color:#38a01d">${item.invoiceStatus}</div></div>
     </section>
     <section class="panel">
       <div class="inline-actions" style="justify-content:space-between;margin-bottom:22px">
         <div>
-          <strong>蓝票开具成功</strong>
+          <strong>${redInvoice ? "红字发票处理成功" : "蓝票开具成功"}</strong>
           <div class="hint">申请号：182247701466 ｜ 发票号码：${item.invoiceNo} ｜ 价税合计：${item.amount} ｜ 开票日期：2025-12-16</div>
         </div>
         <button class="btn primary">撤销</button>
       </div>
       <div class="processed-invoice">
         <div class="invoice-meta"><span>发票号码：${item.invoiceNo}</span><span>开票日期：2025-12-16</span></div>
-        <h2>电子发票（普通发票）</h2>
+        <h2>电子发票（${item.invoiceType}）</h2>
         <table class="red-table">
           <tbody>
             <tr><td style="width:52px">购买方信息</td><td>名称：${item.buyer}<br />统一社会信用代码/纳税人识别号：${item.buyerTaxNo}</td><td style="width:52px">销售方信息</td><td>名称：${item.seller}<br />统一社会信用代码/纳税人识别号：${item.sellerTaxNo}</td></tr>
@@ -812,7 +740,7 @@ function renderInvoiceDetail() {
 }
 
 function openCreateModal() {
-  state.modalBusinessType = "";
+  state.templateBusinessTypes = [];
   modalRoot.innerHTML = `
     <div class="modal-mask" data-close-modal>
       <div class="modal" role="dialog" aria-modal="true">
@@ -824,16 +752,7 @@ function openCreateModal() {
           <p class="hint" style="margin-top:0">创建批量开票任务后，即可导入待开票信息</p>
           <div class="field" style="margin-bottom:18px">
             <label><span class="required">*</span>任务描述</label>
-            <textarea id="task-desc">2026年05月13日批量开具蓝字发票</textarea>
-          </div>
-          <div class="field">
-            <label>特定业务类型</label>
-            <select data-action="modal-business-type">
-              <option value="">仅在开具特定业务发票时需选择</option>
-              ${["REAL_ESTATE_LEASE", "JEWELRY", "REFINED_OIL"].map((type) => `
-                <option value="${type}">${businessLabel(type)}</option>
-              `).join("")}
-            </select>
+            <textarea id="task-desc">2026年05月15日批量开具蓝字发票</textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -874,9 +793,8 @@ document.addEventListener("click", (event) => {
   if (action === "create-task") {
     const newTask = {
       id: String(186247900000 + tasks.length),
-      createTime: "2026-05-13 14:30:00",
+      createTime: "2026-05-15 14:30:00",
       taskType: "批量开具蓝字发票",
-      businessType: state.modalBusinessType || "NONE",
       desc: modalRoot.querySelector("#task-desc").value || "批量开具蓝字发票",
       imported: 0,
       pending: 0,
@@ -888,6 +806,7 @@ document.addEventListener("click", (event) => {
       status: "待导入",
       creator: "管理员",
       step: "upload",
+      demoCheckResult: "missing-required",
     };
     tasks.unshift(newTask);
     state.currentTaskId = newTask.id;
@@ -900,14 +819,10 @@ document.addEventListener("click", (event) => {
     state.currentTaskId = target.dataset.task;
     state.view = "taskDetail";
     state.taskTab = "pending";
-    render();
-  }
-  if (action === "filter-business") {
-    state.filterType = target.value;
+    state.templateBusinessTypes = [];
     render();
   }
   if (action === "clear-filter") {
-    state.filterType = "ALL";
     render();
   }
   if (action === "start-check") {
@@ -929,9 +844,9 @@ document.addEventListener("click", (event) => {
   if (action === "show-task-list") {
     const task = tasks.find((item) => item.id === target.dataset.task);
     task.step = "done";
-    task.imported = Math.max(task.imported, 12);
-    task.pending = Math.max(task.pending, 3);
-    task.processed = Math.max(task.processed, 9);
+    task.imported = Math.max(task.imported, 5);
+    task.pending = Math.max(task.pending, 4);
+    task.processed = Math.max(task.processed, 1);
     state.taskTab = target.dataset.tab;
     render();
   }
@@ -951,12 +866,13 @@ document.addEventListener("click", (event) => {
   }
   if (action === "confirm-invoice") {
     const item = applications.find((appItem) => appItem.id === target.dataset.app);
-    item.status = "开票成功";
-    item.invoiceStatus = "开票成功";
+    const redInvoice = item.invoiceType.includes("红字");
+    item.status = redInvoice ? "红冲成功" : "开票成功";
+    item.invoiceStatus = item.status;
     item.invoiceNo = "253120000004159" + item.id.slice(-4);
     state.view = "invoiceDetail";
     render();
-    toast("开票成功");
+    toast(redInvoice ? "红冲成功" : "开票成功");
   }
   if (action === "view-invoice") {
     state.currentApplicationId = target.dataset.app;
@@ -968,12 +884,14 @@ document.addEventListener("click", (event) => {
 document.addEventListener("change", (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
-  if (target.dataset.action === "filter-business") {
-    state.filterType = target.value;
+  if (target.dataset.action === "template-business-toggle") {
+    if (target.checked && !state.templateBusinessTypes.includes(target.value)) {
+      state.templateBusinessTypes.push(target.value);
+    }
+    if (!target.checked) {
+      state.templateBusinessTypes = state.templateBusinessTypes.filter((type) => type !== target.value);
+    }
     render();
-  }
-  if (target.dataset.action === "modal-business-type") {
-    state.modalBusinessType = target.value;
   }
 });
 

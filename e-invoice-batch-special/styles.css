@@ -595,6 +595,34 @@ tbody tr:hover td {
   margin-top: 12px;
 }
 
+.template-selector {
+  margin-top: 12px;
+}
+
+.template-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.template-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  background: #fff;
+  color: #333;
+}
+
+.template-option input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
 .hint {
   color: #8c8c8c;
   font-size: 13px;
