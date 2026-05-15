@@ -433,6 +433,7 @@ function renderUploadStep(task) {
               </label>
             `).join("")}
           </div>
+          <div class="hint">选择仅影响下载模板内容，不限制后续上传文件</div>
           <div class="template-line">
             <button class="btn">▣ ${templateDownloadButtonLabel()}</button>
             <span class="hint">基础列 A-Z 固定，所选特定业务要素列追加在 Z 列之后</span>
