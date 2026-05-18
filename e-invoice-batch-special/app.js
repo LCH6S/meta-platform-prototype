@@ -673,9 +673,9 @@ function renderProcessedRemark(item) {
     .filter(([, value]) => value)
     .map(([label, value]) => `<div><span>${escapeHtml(label)}：</span>${escapeHtml(value)}</div>`)
     .join("");
+  if (!rows) return "";
   return `
     <div class="invoice-remark-content">
-      <div class="invoice-remark-title">特定业务信息：${businessLabel(item.businessType)}</div>
       <div class="invoice-remark-fields">${rows}</div>
     </div>
   `;
