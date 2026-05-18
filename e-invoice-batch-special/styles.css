@@ -802,11 +802,6 @@ tbody tr:hover td {
   color: #8c1d18;
 }
 
-.invoice-remark-title {
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
 .invoice-remark-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(240px, 1fr));
