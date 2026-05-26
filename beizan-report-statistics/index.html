@@ -488,6 +488,49 @@
 
     .searchbox:disabled { cursor: not-allowed; color: #94a3b8; }
 
+    .sortable-col {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sortable-col:hover {
+      background: #edf3ff;
+    }
+
+    .sort-header {
+      width: 100%;
+      min-height: 24px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      font-size: inherit;
+      font-weight: inherit;
+      cursor: pointer;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .sort-indicator {
+      width: 14px;
+      color: #a0a7b2;
+      font-size: 11px;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .sortable-col.sorted .sort-header {
+      color: var(--blue);
+    }
+
+    .sortable-col.sorted .sort-indicator {
+      color: var(--blue);
+    }
+
     .table-wrap {
       height: calc(var(--table-group-height) + var(--table-metric-height) + var(--table-row-height) * 20 + var(--table-footer-height));
       min-height: calc(var(--table-group-height) + var(--table-metric-height) + var(--table-row-height) * 20 + var(--table-footer-height));
@@ -826,14 +869,6 @@
             <div class="table-toolbar">
               <div class="toolbar-left">
                 <h2 class="section-title" id="tableTitle"></h2>
-                <select class="control" id="sortSelect" style="width:150px;height:30px;font-size:12px;">
-                  <option value="payAmount">按支付金额排序</option>
-                  <option value="refundAbs">按退款金额排序</option>
-                  <option value="feeAmount">按手续费排序</option>
-                  <option value="payCount">按支付笔数排序</option>
-                  <option value="netAmount">按净收金额排序</option>
-                  <option value="tradeCount">按总交易笔数排序</option>
-                </select>
               </div>
             </div>
             <div class="table-wrap" id="tableWrap"></div>
@@ -916,7 +951,7 @@
       activePage: "storeSales",
       pages: Object.fromEntries(Object.keys(pages).map(pageId => [pageId, {
         hasQueried: false,
-        sortKey: "payAmount",
+        sort: defaultSort(pages[pageId]),
         filters: defaultFilters(pages[pageId]),
       }])),
     };
@@ -1014,6 +1049,10 @@
 
     function defaultFilters(page) {
       return Object.fromEntries(page.filters.map(field => [field.key, field.default ?? ""]));
+    }
+
+    function defaultSort(page) {
+      return { key: "", direction: "desc" };
     }
 
     function h(value) {
@@ -1148,7 +1187,7 @@
       const pageState = currentPageState();
       pageState.filters = defaultFilters(page);
       pageState.hasQueried = false;
-      pageState.sortKey = "payAmount";
+      pageState.sort = defaultSort(page);
       renderQuery();
       renderResult();
       showToast("已重置筛选条件");
@@ -1172,9 +1211,6 @@
       const rows = getRows(page, pageState);
       $("#resultPanel").classList.remove("is-hidden");
       $("#tableTitle").textContent = page.tableTitle;
-      $("#sortSelect").classList.toggle("is-hidden", page.type !== "store");
-      $("#sortSelect").disabled = page.type !== "store";
-      $("#sortSelect").value = pageState.sortKey;
       $("#scopeValue").textContent = scopeText(page, pageState);
       $("#scopeResult").textContent = `当前结果 ${number(rows.length)} ${page.resultUnit}`;
       $("#exportBtn").disabled = rows.length === 0;
@@ -1237,10 +1273,7 @@
       if (state.activePage === "dailySales") rows = getDailySalesRows(page, pageState);
       if (page.type === "store") rows = filterStoreRows(rows, pageState);
       if (page.type === "flat") rows = filterFlatRows(rows, pageState);
-      if (page.type === "store") {
-        rows = [...rows].sort((a, b) => sortValue(b, pageState.sortKey) - sortValue(a, pageState.sortKey));
-      }
-      return rows;
+      return sortRows(page, rows, pageState);
     }
 
     function filterStoreRows(rows, pageState) {
@@ -1356,9 +1389,71 @@
       return distributeInteger(cents, weights).map(value => round2(sign * Math.abs(value) / 100));
     }
 
-    function sortValue(row, sortKey) {
-      if (sortKey === "refundAbs") return Math.abs(row.subtotal.refundAmount);
-      return row.subtotal[sortKey] || 0;
+    function sortRows(page, rows, pageState) {
+      const sort = pageState.sort || defaultSort(page);
+      if (!sort.key) return rows;
+      const metric = findMetricBySortKey(page, sort.key);
+      if (!metric) return rows;
+      const multiplier = sort.direction === "asc" ? 1 : -1;
+      return [...rows].sort((a, b) => {
+        const diff = sortableMetricValue(page, a, sort.key) - sortableMetricValue(page, b, sort.key);
+        if (diff !== 0) return diff * multiplier;
+        return rowStableLabel(page, a).localeCompare(rowStableLabel(page, b), "zh-CN");
+      });
+    }
+
+    function findMetricBySortKey(page, sortKey) {
+      if (page.type === "flat") return page.data.metrics.find(metric => metric.key === sortKey);
+      return page.metrics?.find(metric => metric.key === sortKey) || null;
+    }
+
+    function sortableMetricValue(page, row, sortKey) {
+      let value = 0;
+      if (page.type === "flat") value = Number(row.metrics?.[sortKey] || 0);
+      else value = Number(row.subtotal?.[sortKey] || 0);
+      if (sortKey === "refundAmount" || sortKey === "退款金额") return Math.abs(value);
+      return value;
+    }
+
+    function rowStableLabel(page, row) {
+      if (page.type === "store") return `${row.storeName || ""}${row.storeNo || ""}`;
+      if (page.type === "summaryDrilldown") return Object.values(row.dimensions || {}).join("");
+      if (page.type === "flat") return [row.date, row.merchantName, row.storeType, row.paymentMethod].join("");
+      return "";
+    }
+
+    function sortableHeader(metric, extraClass = "") {
+      const pageState = currentPageState();
+      const sort = pageState.sort || {};
+      const active = sort.key === metric.key;
+      const direction = active ? sort.direction : "";
+      const indicator = active ? (direction === "asc" ? "↑" : "↓") : "↕";
+      const title = active
+        ? `按${metric.label}${direction === "asc" ? "升序" : "降序"}排列`
+        : `按${metric.label}排序`;
+      return `
+        <th class="${extraClass} sortable-col ${active ? "sorted" : ""}" data-sort-key="${h(metric.key)}" data-sort-label="${h(metric.label)}" aria-sort="${active ? (direction === "asc" ? "ascending" : "descending") : "none"}">
+          <button class="sort-header" type="button" title="${h(title)}">
+            <span>${h(metric.label)}</span>
+            <span class="sort-indicator" aria-hidden="true">${indicator}</span>
+          </button>
+        </th>
+      `;
+    }
+
+    function bindSortableHeaders() {
+      $$("#tableWrap [data-sort-key]").forEach(header => {
+        header.onclick = () => {
+          const pageState = currentPageState();
+          const key = header.dataset.sortKey;
+          const current = pageState.sort || defaultSort(currentPage());
+          pageState.sort = {
+            key,
+            direction: current.key === key && current.direction === "desc" ? "asc" : "desc",
+          };
+          renderResult();
+        };
+      });
     }
 
     function emptySummary() {
@@ -1489,7 +1584,7 @@
     function renderStoreTable(page, rows) {
       const headers = [
         `<th class="sticky-dim">门店</th>`,
-        ...page.metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`),
+        ...page.metrics.map(metric => sortableHeader(metric, metric.type === "money" ? "amount-cell wide" : "num-cell")),
       ].join("");
 
       const body = rows.map(row => {
@@ -1518,6 +1613,7 @@
       $$("#tableWrap [data-store-no]").forEach(button => {
         button.onclick = () => openStoreDrawer(button.dataset.storeNo);
       });
+      bindSortableHeaders();
     }
 
     function renderSummaryDrilldownTable(page, rows) {
@@ -1526,7 +1622,7 @@
       const visibleDimensions = page.compactMetaKey ? dimensions.filter(dimension => dimension.key !== page.compactMetaKey) : dimensions;
       const headers = [
         ...visibleDimensions.map(dimension => `<th class="${dimension.fixed ? "sticky-dim" : "dimension-cell"}">${h(dimension.label)}</th>`),
-        ...page.metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`),
+        ...page.metrics.map(metric => sortableHeader(metric, metric.type === "money" ? "amount-cell wide" : "num-cell")),
       ].join("");
 
       const body = rows.map((row, rowIndex) => {
@@ -1564,6 +1660,7 @@
           openSalesBreakdownDrawer(state.activePage, row);
         };
       });
+      bindSortableHeaders();
     }
 
     function renderPivotTable(page, rows) {
@@ -1642,7 +1739,7 @@
 
       const header = [
         ...dimensions.map(dimension => `<th class="${dimension.fixed ? "sticky-dim" : "dimension-cell"}">${h(dimension.label)}</th>`),
-        ...metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`),
+        ...metrics.map(metric => sortableHeader(metric, metric.type === "money" ? "amount-cell wide" : "num-cell")),
       ].join("");
 
       $("#tableWrap").className = "table-wrap normal-table";
@@ -1654,6 +1751,7 @@
           <tbody>${body}</tbody>
         </table>
       `;
+      bindSortableHeaders();
     }
 
     function summarizeFlat(rows, metrics) {
@@ -1873,11 +1971,6 @@
 
     $("#filterGrid").addEventListener("input", handleFilterChange);
     $("#filterGrid").addEventListener("change", handleFilterChange);
-    $("#sortSelect").onchange = event => {
-      const pageState = currentPageState();
-      pageState.sortKey = event.target.value;
-      if (pageState.hasQueried) renderResult();
-    };
     $("#exportBtn").onclick = exportCsv;
     $("#drawerClose").onclick = () => $("#drawerMask").classList.remove("open");
     $("#drawerMask").onclick = event => {
