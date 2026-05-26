@@ -1,0 +1,1890 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>倍赞报表统计 Demo</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --surface-soft: #f9fafb;
+      --text: #1f2329;
+      --muted: #646a73;
+      --border: #e5e6eb;
+      --border-soft: #f0f2f5;
+      --border-strong: #d0d5dd;
+      --header: #141414;
+      --primary: #ffb300;
+      --blue: #0064fa;
+      --green: #0ca678;
+      --red: #d92d20;
+      --shadow: 0 4px 14px rgba(31, 35, 41, .04);
+      --radius: 8px;
+      --table-group-height: 36px;
+      --table-metric-height: 36px;
+      --table-row-height: 56px;
+      --table-footer-height: 38px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 56px 1fr;
+    }
+
+    .topbar {
+      height: 56px;
+      background: var(--header);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 28px;
+      position: sticky;
+      top: 0;
+      z-index: 80;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 190px;
+      font-weight: 800;
+    }
+
+    .brand-mark {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: var(--primary);
+      color: #111;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+    }
+
+    .topnav {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: rgba(255, 255, 255, .72);
+    }
+
+    .topnav span {
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+    }
+
+    .topnav .active {
+      color: #fff;
+      border-bottom: 3px solid var(--primary);
+      font-weight: 700;
+    }
+
+    .userbar {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: rgba(255, 255, 255, .84);
+      font-size: 13px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: calc(100vh - 56px);
+    }
+
+    .sidebar {
+      background: #fff;
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      position: sticky;
+      top: 56px;
+      height: calc(100vh - 56px);
+      overflow: auto;
+    }
+
+    .side-section { margin-bottom: 16px; }
+
+    .side-title {
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .side-link {
+      display: block;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      padding: 10px 12px 10px 22px;
+      border-radius: 8px;
+      color: #4e5969;
+      font-size: 13px;
+    }
+
+    .side-link:hover {
+      background: #f7f8fa;
+      color: var(--text);
+    }
+
+    .side-link.active {
+      background: #f0f6ff;
+      color: var(--blue);
+      font-weight: 600;
+      position: relative;
+    }
+
+    .side-link.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 4px;
+      background: var(--blue);
+    }
+
+    .content {
+      padding: 20px 24px 28px;
+      min-width: 0;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .query-panel {
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .query-head {
+      padding-bottom: 18px;
+      margin-bottom: 2px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      line-height: 1.25;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+
+    .page-desc {
+      margin: 0;
+      color: var(--muted);
+      max-width: 900px;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--filter-columns, 4), minmax(180px, 1fr)) auto;
+      gap: 16px;
+      align-items: end;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .control {
+      width: 100%;
+      height: 32px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: #f7f8fa;
+      outline: none;
+      color: var(--text);
+      padding: 0 12px;
+      font-weight: 500;
+    }
+
+    .control:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 2px rgba(0, 100, 250, .12);
+    }
+
+    .control:disabled {
+      cursor: not-allowed;
+      color: #6b7280;
+      opacity: .9;
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      height: 32px;
+      border: 1px solid var(--border-strong);
+      background: #fff;
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background .16s ease, border-color .16s ease, color .16s ease;
+    }
+
+    .btn:hover { border-color: var(--blue); color: var(--blue); background: #f5f8ff; }
+    .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .btn.primary:hover { background: #0052d9; border-color: #0052d9; color: #fff; }
+    .btn:disabled { cursor: not-allowed; opacity: .45; }
+    .btn.text { border: 0; background: transparent; color: #475569; }
+
+    .result-panel {
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .scope-panel {
+      padding: 14px 16px 10px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+    }
+
+    .scope-label, .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .scope-label {
+      margin-bottom: 0;
+      font-weight: 800;
+    }
+
+    .scope-value {
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .scope-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      white-space: nowrap;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      padding: 10px 16px 14px;
+      overflow: hidden;
+    }
+
+    .summary-strip.reconcile-summary {
+      display: block;
+    }
+
+    .reconcile-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .formula-panel {
+      margin-top: 12px;
+      padding: 14px 16px;
+      border-radius: 6px;
+      background: #fbfcfd;
+    }
+
+    .formula-title {
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .formula-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .formula-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .formula-item {
+      min-width: 142px;
+      padding: 9px 10px;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid var(--border-soft);
+    }
+
+    .formula-item strong,
+    .formula-item span,
+    .formula-item em {
+      display: block;
+    }
+
+    .formula-item span {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .formula-item strong {
+      color: var(--text);
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+      font-family: var(--mono);
+    }
+
+    .formula-item em {
+      color: var(--muted);
+      font-size: 12px;
+      font-style: normal;
+      margin-top: 4px;
+    }
+
+    .formula-item.result {
+      background: #f0fdf4;
+      border-color: #c6f6d5;
+    }
+
+    .formula-item.neutral {
+      background: #f7f8fa;
+    }
+
+    .formula-op {
+      min-width: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #4e5969;
+      font-weight: 800;
+      font-size: 16px;
+    }
+
+    .formula-note {
+      margin: 2px 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .metric-cell {
+      min-height: 84px;
+      padding: 14px 16px;
+      border-radius: 6px;
+      background: #f7f8fa;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .refund { color: var(--red); }
+    .good { color: var(--green); }
+    .muted { color: var(--muted); }
+    .is-hidden { display: none !important; }
+
+    .table-panel {
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      min-height: 52px;
+      padding: 10px 16px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .section-title {
+      margin: 0 8px 0 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .searchbox {
+      width: 210px;
+      height: 32px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 0 12px;
+      outline: none;
+      font-size: 13px;
+      background: #f7f8fa;
+    }
+
+    .searchbox:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 2px rgba(0, 100, 250, .12);
+    }
+
+    .searchbox:disabled { cursor: not-allowed; color: #94a3b8; }
+
+    .table-wrap {
+      height: calc(var(--table-group-height) + var(--table-metric-height) + var(--table-row-height) * 20 + var(--table-footer-height));
+      min-height: calc(var(--table-group-height) + var(--table-metric-height) + var(--table-row-height) * 20 + var(--table-footer-height));
+      overflow: auto;
+      scrollbar-gutter: stable;
+      position: relative;
+      background: #fff;
+    }
+
+    .table-wrap.single-head {
+      height: calc(var(--table-group-height) + var(--table-row-height) * 20 + var(--table-footer-height));
+      min-height: calc(var(--table-group-height) + var(--table-row-height) * 20 + var(--table-footer-height));
+    }
+
+    .table-wrap.no-footer {
+      height: calc(var(--table-group-height) + var(--table-row-height) * 20);
+      min-height: calc(var(--table-group-height) + var(--table-row-height) * 20);
+    }
+
+    .table-wrap.normal-table {
+      height: auto;
+      min-height: 0;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .table-wrap.empty-wrap {
+      height: 360px;
+      min-height: 360px;
+    }
+
+    .empty-state {
+      height: 100%;
+      min-height: 360px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--muted);
+      text-align: center;
+      background: #fff;
+    }
+
+    .empty-title {
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .empty-desc { font-size: 13px; }
+
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+      width: max-content;
+      min-width: 100%;
+      background: #fff;
+      font-size: 12px;
+    }
+
+    th, td {
+      border-right: 0;
+      border-bottom: 1px solid var(--border-soft);
+      padding: 0 12px;
+      white-space: nowrap;
+      vertical-align: middle;
+      background: #fff;
+    }
+
+    th {
+      position: sticky;
+      z-index: 10;
+      background: #f7f8fa;
+      color: var(--muted);
+      font-weight: 600;
+      text-align: center;
+      border-bottom-color: var(--border);
+    }
+
+    thead tr.group th {
+      top: 0;
+      height: var(--table-group-height);
+      background: #f7f8fa;
+    }
+
+    thead tr.metric th {
+      top: var(--table-group-height);
+      height: var(--table-metric-height);
+      background: #fbfdff;
+      font-size: 12px;
+    }
+
+    thead tr.single th {
+      top: 0;
+      height: var(--table-group-height);
+      background: #f7f8fa;
+    }
+
+    tbody tr:hover td { background: #f5f8ff; }
+    tbody td { height: var(--table-row-height); }
+
+    .sticky-dim {
+      position: sticky;
+      left: 0;
+      width: 240px;
+      min-width: 240px;
+      max-width: 240px;
+      z-index: 16;
+      text-align: left;
+      box-shadow: 8px 0 18px rgba(255, 255, 255, .9);
+    }
+
+    thead .sticky-dim {
+      z-index: 24;
+      background: #f7f8fa;
+    }
+
+    tbody .sticky-dim,
+    tfoot .sticky-dim {
+      background: #fff;
+    }
+
+    tbody tr:hover .sticky-dim { background: #f5f8ff; }
+
+    .store-name-link {
+      display: block;
+      max-width: 210px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--blue);
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .store-name-link:hover { text-decoration: underline; }
+
+    .store-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .amount-cell, .num-cell {
+      min-width: 108px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-family: var(--mono);
+    }
+
+    .amount-cell.wide { min-width: 124px; }
+    .dimension-cell { min-width: 128px; }
+    .zero { color: #a6abb5; }
+    .negative { color: var(--red); }
+    .net-positive { color: #087f5b; }
+
+    .subtotal-cell {
+      background: #fffdf5;
+      font-weight: 700;
+    }
+
+    tfoot td {
+      position: sticky;
+      bottom: 0;
+      height: var(--table-footer-height);
+      z-index: 18;
+      background: #fffaf0;
+      border-top: 1px solid #ffe1a6;
+      font-weight: 700;
+    }
+
+    tfoot .sticky-dim {
+      z-index: 26;
+      background: #fffaf0;
+    }
+
+    .drawer-mask {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, .42);
+      display: none;
+      justify-content: flex-end;
+      z-index: 100;
+    }
+
+    .drawer-mask.open { display: flex; }
+
+    .drawer {
+      width: min(980px, 94vw);
+      height: 100vh;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -12px 0 32px rgba(31, 35, 41, .18);
+    }
+
+    .drawer-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .drawer-head h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    .drawer-body {
+      padding: 16px 18px 24px;
+      overflow: auto;
+    }
+
+    .drawer-kpis {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .drawer-kpi {
+      background: #fbfcfd;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .drawer-kpi span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .drawer-kpi strong {
+      display: block;
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .toast {
+      position: fixed;
+      top: 74px;
+      right: 24px;
+      z-index: 120;
+      display: none;
+      background: #111827;
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .toast.open { display: block; }
+
+    @media (max-width: 1180px) {
+      .filter-grid { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+      .filter-actions { justify-content: flex-start; }
+      .scope-panel { grid-template-columns: 1fr; align-items: start; }
+      .scope-actions { justify-content: flex-start; }
+    }
+
+    @media (max-width: 860px) {
+      .main { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .content { padding: 14px; }
+      .drawer-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">收</span><span>Meta 平台</span></div>
+      <nav class="topnav" aria-label="主导航">
+        <span data-top-nav="home">首页</span>
+        <span class="active" data-top-nav="trade">交易统计</span>
+        <span data-top-nav="reconcile">对账</span>
+        <span data-top-nav="settlement">结算</span>
+        <span data-top-nav="invoice">发票</span>
+      </nav>
+      <div class="userbar">
+        <span>导出记录</span>
+        <span>财务用户</span>
+      </div>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <div class="side-section">
+          <div class="side-title">交易统计</div>
+          <button class="side-link" data-page="storeTransactionSummary">门店交易汇总查询</button>
+          <button class="side-link" data-page="groupSales">集团销售报表</button>
+          <button class="side-link" data-page="dailySales">按日销售报表</button>
+          <button class="side-link active" data-page="storeSales">门店销售报表</button>
+        </div>
+        <div class="side-section">
+          <div class="side-title">财务核对</div>
+          <button class="side-link" data-page="merchantReconcile">商户对账报表</button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="panel query-panel">
+          <div class="query-head">
+            <h1 id="pageTitle"></h1>
+            <p class="page-desc" id="pageDesc"></p>
+          </div>
+
+          <div class="filter-grid" id="filterGrid"></div>
+        </section>
+
+        <section class="panel result-panel is-hidden" id="resultPanel">
+          <div class="scope-panel" id="scopePanel">
+            <div class="scope-label">当前范围</div>
+            <div class="scope-value" id="scopeValue"></div>
+            <div class="scope-actions">
+              <div class="metric-note" id="scopeResult"></div>
+              <button class="btn primary" id="exportBtn">导出当前结果</button>
+            </div>
+          </div>
+
+          <div class="summary-strip" id="summaryStrip"></div>
+
+          <div class="table-panel">
+            <div class="table-toolbar">
+              <div class="toolbar-left">
+                <h2 class="section-title" id="tableTitle"></h2>
+                <select class="control" id="sortSelect" style="width:150px;height:30px;font-size:12px;">
+                  <option value="payAmount">按支付金额排序</option>
+                  <option value="refundAbs">按退款金额排序</option>
+                  <option value="feeAmount">按手续费排序</option>
+                  <option value="payCount">按支付笔数排序</option>
+                  <option value="netAmount">按净收金额排序</option>
+                  <option value="tradeCount">按总交易笔数排序</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-wrap" id="tableWrap"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="drawer-mask" id="drawerMask">
+    <aside class="drawer" aria-label="门店支付方式明细">
+      <div class="drawer-head">
+        <div>
+          <h3 id="drawerTitle"></h3>
+          <div class="metric-note" id="drawerSub"></div>
+        </div>
+        <button class="btn" id="drawerClose">关闭</button>
+      </div>
+      <div class="drawer-body" id="drawerBody"></div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="./report-demo-data.js"></script>
+  <script>
+    const reportData = window.REPORT_DEMO_DATA;
+
+    const salesMetrics = [
+      { key: "payCount", label: "支付笔数", type: "count" },
+      { key: "payAmount", label: "支付金额", type: "money" },
+      { key: "refundCount", label: "退款笔数", type: "count" },
+      { key: "refundAmount", label: "退款金额", type: "money", refund: true },
+      { key: "feeAmount", label: "手续费", type: "money" },
+      { key: "netAmount", label: "净收金额", type: "money", net: true },
+      { key: "tradeCount", label: "总交易笔数", type: "count" },
+    ];
+
+    const transactionMetrics = [
+      { key: "payCount", label: "支付笔数", type: "count" },
+      { key: "payAmount", label: "支付金额", type: "money" },
+      { key: "refundCount", label: "退款笔数", type: "count" },
+      { key: "refundAmount", label: "退款金额", type: "money", refund: true },
+      { key: "netAmount", label: "净收金额", type: "money", net: true },
+      { key: "tradeCount", label: "总交易笔数", type: "count" },
+    ];
+
+    const storeSummaryCards = [
+      { key: "payAmount", label: "支付金额", type: "money", noteKey: "payCount", noteLabel: "笔支付" },
+      { key: "refundAmount", label: "退款金额", type: "money", refund: true, noteKey: "refundCount", noteLabel: "笔退款" },
+      { key: "netAmount", label: "净收金额", type: "money", net: true, note: "支付金额 + 退款金额" },
+      { key: "tradeCount", label: "总交易笔数", type: "count", note: "支付笔数 + 退款笔数" },
+    ];
+
+    const salesSummaryCards = [
+      { key: "payAmount", label: "支付金额", type: "money", noteKey: "payCount", noteLabel: "笔支付" },
+      { key: "refundAmount", label: "退款金额", type: "money", refund: true, noteKey: "refundCount", noteLabel: "笔退款" },
+      { key: "feeAmount", label: "手续费", type: "money", note: "按支付方式汇总" },
+      { key: "netAmount", label: "净收金额", type: "money", net: true, note: "支付金额 + 退款金额 - 手续费" },
+      { key: "tradeCount", label: "总交易笔数", type: "count", note: "支付笔数 + 退款笔数" },
+    ];
+
+    const reconcileSummaryCards = [
+      { key: "交易金额", label: "交易金额", type: "money", noteKey: "交易笔数", noteLabel: "笔交易" },
+      { key: "退款金额", label: "退款金额", type: "money", refund: true, noteKey: "退款笔数", noteLabel: "笔退款" },
+      { key: "商户优惠", label: "商户优惠", type: "money", note: "商家承担，影响实收金额" },
+      { key: "支付渠道优惠", label: "支付渠道优惠", type: "money", note: "渠道出资，不影响商家实收" },
+      { key: "商户预充值优惠", label: "商户预充值优惠", type: "money", note: "已预充值，不影响交易实收" },
+      { key: "商户免充值优惠", label: "商户免充值优惠", type: "money", note: "商家承担，影响实收金额" },
+      { key: "实收金额", label: "实收金额", type: "money", note: "交易金额 + 退款金额 - 商户优惠 - 商户免充值优惠" },
+      { key: "渠道手续费", label: "渠道手续费", type: "money", note: "按支付方式汇总" },
+      { key: "结算金额", label: "结算金额", type: "money", net: true, note: "实收金额 - 渠道手续费" },
+    ];
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+    const pages = buildPageConfigs();
+    const state = {
+      activePage: "storeSales",
+      pages: Object.fromEntries(Object.keys(pages).map(pageId => [pageId, {
+        hasQueried: false,
+        sortKey: "payAmount",
+        filters: defaultFilters(pages[pageId]),
+      }])),
+    };
+    const renderedRows = {};
+    const dailyStoreRowsCache = {};
+
+    function buildPageConfigs() {
+      const data = reportData.pages;
+      const storeTypes = ["全部", ...Object.keys(data.storeSales.storeTypeCounts)];
+      return {
+        storeTransactionSummary: {
+          data: data.storeTransactionSummary,
+          type: "summaryDrilldown",
+          topNav: "trade",
+          title: "门店交易汇总查询",
+          desc: "按当前门店查询每日支付、退款和净收数据。",
+          tableTitle: "每日交易汇总",
+          resultUnit: "天",
+          summaryCards: storeSummaryCards,
+          metrics: transactionMetrics,
+          subtotalLabel: "小计",
+          filters: [
+            { key: "storeName", label: "门店", type: "input", default: data.storeTransactionSummary.storeName, readonly: true },
+            { key: "dateRange", label: "订单日期", type: "input", default: data.storeTransactionSummary.dateRange, readonly: true },
+          ],
+        },
+        groupSales: {
+          data: data.groupSales,
+          type: "summaryDrilldown",
+          topNav: "trade",
+          title: "集团销售报表",
+          desc: "按商户和门店类型统计集团范围内的销售、退款、手续费和净收数据。",
+          tableTitle: "商户销售统计",
+          resultUnit: "条统计",
+          summaryCards: salesSummaryCards,
+          metrics: salesMetrics,
+          compactMetaKey: "storeType",
+          subtotalLabel: "商户小计",
+          filters: [
+            { key: "merchant", label: "商户", type: "select", default: "全部商户", options: ["全部商户"] },
+            { key: "dateRange", label: "订单日期", type: "input", default: data.groupSales.dateRange, readonly: true },
+          ],
+        },
+        dailySales: {
+          data: data.dailySales,
+          type: "summaryDrilldown",
+          topNav: "trade",
+          title: "按日销售报表",
+          desc: "按日期查看销售、退款、手续费和净收数据。",
+          tableTitle: "按日销售统计",
+          resultUnit: "天",
+          summaryCards: salesSummaryCards,
+          metrics: salesMetrics,
+          subtotalLabel: "小计",
+          filters: [
+            { key: "merchant", label: "商户", type: "select", default: data.dailySales.merchant, options: [data.dailySales.merchant] },
+            { key: "storeKeyword", label: "门店", type: "input", default: "", placeholder: "输入门店号 / 门店名称" },
+            { key: "dateRange", label: "订单日期", type: "input", default: data.dailySales.dateRange, readonly: true },
+          ],
+        },
+        storeSales: {
+          data: data.storeSales,
+          type: "store",
+          topNav: "trade",
+          title: "门店销售报表",
+          desc: "按门店维度查询销售、退款、手续费和净收数据。",
+          tableTitle: "门店合计列表",
+          resultUnit: "家门店",
+          summaryCards: salesSummaryCards,
+          metrics: salesMetrics,
+          filters: [
+            { key: "merchant", label: "商户", type: "select", default: data.storeSales.merchant, options: [data.storeSales.merchant] },
+            { key: "storeType", label: "门店类型", type: "select", default: "全部", options: storeTypes },
+            { key: "storeKeyword", label: "门店", type: "input", default: "", placeholder: "输入门店号 / 门店名称" },
+            { key: "dateRange", label: "订单日期", type: "input", default: data.storeSales.dateRange, readonly: true },
+          ],
+        },
+        merchantReconcile: {
+          data: data.merchantReconcile,
+          type: "flat",
+          topNav: "reconcile",
+          title: "商户对账报表",
+          desc: "按日期、商户、门店类型和支付方式核对交易、优惠、手续费和结算数据。",
+          tableTitle: "商户对账明细",
+          resultUnit: "条记录",
+          summaryCards: reconcileSummaryCards,
+          filters: [
+            { key: "merchant", label: "商户", type: "select", default: "全部商户", options: ["全部商户"] },
+            { key: "paymentMethod", label: "支付方式", type: "select", default: "全部", options: ["全部", ...data.merchantReconcile.paymentMethods] },
+            { key: "dateRange", label: "日期范围", type: "input", default: data.merchantReconcile.dateRange, readonly: true },
+          ],
+        },
+      };
+    }
+
+    function defaultFilters(page) {
+      return Object.fromEntries(page.filters.map(field => [field.key, field.default ?? ""]));
+    }
+
+    function h(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char]);
+    }
+
+    function money(value) {
+      const n = Number(value || 0);
+      const sign = n < 0 ? "-" : "";
+      return sign + "¥" + Math.abs(n).toLocaleString("zh-CN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function number(value) {
+      return Number(value || 0).toLocaleString("zh-CN");
+    }
+
+    function round2(value) {
+      return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+    }
+
+    function formatMetricValue(metric, value) {
+      return metric.type === "money" ? money(value) : number(value);
+    }
+
+    function valueClass(metric, value) {
+      const classes = [metric.type === "money" ? "amount-cell wide" : "num-cell"];
+      if (Number(value) === 0) classes.push("zero");
+      if ((metric.refund || metric.label === "退款金额" || metric.key === "退款金额") && Number(value) !== 0) classes.push("negative");
+      if (metric.net && Number(value) > 0) classes.push("net-positive");
+      return classes.join(" ");
+    }
+
+    function amountCell(item, metric, extraClass = "") {
+      const value = item?.[metric.key] ?? 0;
+      return `<td class="${valueClass(metric, value)} ${extraClass}">${formatMetricValue(metric, value)}</td>`;
+    }
+
+    function metricFromLabel(item, metric, extraClass = "") {
+      const value = item?.metrics?.[metric.key] ?? 0;
+      return `<td class="${valueClass(metric, value)} ${extraClass}">${formatMetricValue(metric, value)}</td>`;
+    }
+
+    function currentPage() {
+      return pages[state.activePage];
+    }
+
+    function currentPageState() {
+      return state.pages[state.activePage];
+    }
+
+    function renderPage() {
+      renderSidebar();
+      renderTopNav();
+      renderQuery();
+      renderResult();
+    }
+
+    function renderTopNav() {
+      const page = currentPage();
+      $$("[data-top-nav]").forEach(item => {
+        item.classList.toggle("active", item.dataset.topNav === page.topNav);
+      });
+    }
+
+    function renderSidebar() {
+      $$(".side-link").forEach(button => {
+        button.classList.toggle("active", button.dataset.page === state.activePage);
+      });
+    }
+
+    function renderQuery() {
+      const page = currentPage();
+      const pageState = currentPageState();
+      $("#pageTitle").textContent = page.title;
+      $("#pageDesc").textContent = page.desc;
+
+      const fields = page.filters.map(field => renderField(field, pageState.filters[field.key])).join("");
+      $("#filterGrid").style.setProperty("--filter-columns", Math.max(page.filters.length, 2));
+      $("#filterGrid").innerHTML = `
+        ${fields}
+        <div class="filter-actions">
+          <button class="btn text" id="resetBtn" type="button">重置</button>
+          <button class="btn primary" id="queryBtn" type="button">查询</button>
+        </div>
+      `;
+
+      $("#resetBtn").onclick = resetCurrentPage;
+      $("#queryBtn").onclick = queryCurrentPage;
+    }
+
+    function renderField(field, value) {
+      const disabled = field.disabled ? "disabled" : "";
+      const readonly = field.readonly ? "readonly" : "";
+      if (field.type === "select") {
+        return `
+          <div class="field">
+            <label>${h(field.label)}</label>
+            <select class="control" data-filter="${h(field.key)}" ${disabled}>
+              ${field.options.map(option => `<option value="${h(option)}" ${option === value ? "selected" : ""}>${h(option)}</option>`).join("")}
+            </select>
+          </div>
+        `;
+      }
+      return `
+        <div class="field">
+          <label>${h(field.label)}</label>
+          <input class="control" data-filter="${h(field.key)}" value="${h(value)}" placeholder="${h(field.placeholder || "")}" ${readonly} ${disabled} />
+        </div>
+      `;
+    }
+
+    function handleFilterChange(event) {
+      const key = event.target.dataset.filter;
+      if (!key || event.target.readOnly || event.target.disabled) return;
+      const pageState = currentPageState();
+      pageState.filters[key] = event.target.value.trim();
+      pageState.hasQueried = false;
+      renderResult();
+    }
+
+    function resetCurrentPage() {
+      const page = currentPage();
+      const pageState = currentPageState();
+      pageState.filters = defaultFilters(page);
+      pageState.hasQueried = false;
+      pageState.sortKey = "payAmount";
+      renderQuery();
+      renderResult();
+      showToast("已重置筛选条件");
+    }
+
+    function queryCurrentPage() {
+      const pageState = currentPageState();
+      pageState.hasQueried = true;
+      renderResult();
+      showToast("已按当前条件刷新");
+    }
+
+    function renderResult() {
+      const page = currentPage();
+      const pageState = currentPageState();
+      if (!pageState.hasQueried) {
+        $("#resultPanel").classList.add("is-hidden");
+        return;
+      }
+
+      const rows = getRows(page, pageState);
+      $("#resultPanel").classList.remove("is-hidden");
+      $("#tableTitle").textContent = page.tableTitle;
+      $("#sortSelect").classList.toggle("is-hidden", page.type !== "store");
+      $("#sortSelect").disabled = page.type !== "store";
+      $("#sortSelect").value = pageState.sortKey;
+      $("#scopeValue").textContent = scopeText(page, pageState);
+      $("#scopeResult").textContent = `当前结果 ${number(rows.length)} ${page.resultUnit}`;
+      $("#exportBtn").disabled = rows.length === 0;
+
+      if (!rows.length) {
+        $("#summaryStrip").classList.add("is-hidden");
+        $("#summaryStrip").innerHTML = "";
+        $("#tableWrap").className = "table-wrap single-head empty-wrap";
+        $("#tableWrap").innerHTML = `
+          <div class="empty-state">
+            <div class="empty-title">暂无数据</div>
+            <div class="empty-desc">当前查询条件下没有可展示记录</div>
+          </div>
+        `;
+        return;
+      }
+
+      if (page.summaryCards) {
+        const summary = summarizePage(page, rows);
+        renderSummary(page, summary);
+      } else {
+        $("#summaryStrip").classList.add("is-hidden");
+        $("#summaryStrip").innerHTML = "";
+      }
+
+      if (page.type === "store") renderStoreTable(page, rows);
+      if (page.type === "summaryDrilldown") renderSummaryDrilldownTable(page, rows);
+      if (page.type === "pivot") renderPivotTable(page, rows);
+      if (page.type === "flat") renderFlatTable(page, rows);
+    }
+
+    function scopeText(page, pageState) {
+      const filters = pageState.filters;
+      if (page.type === "store") {
+        return [
+          filters.merchant,
+          filters.storeType === "全部" ? "全部门店类型" : filters.storeType,
+          filters.storeKeyword ? "门店搜索：" + filters.storeKeyword : "全部门店",
+          filters.dateRange,
+        ].join("｜");
+      }
+      if (page.type === "flat") {
+        return [
+          filters.merchant,
+          filters.paymentMethod === "全部" ? "全部支付方式" : filters.paymentMethod,
+          filters.dateRange,
+        ].join("｜");
+      }
+      if (state.activePage === "storeTransactionSummary") {
+        return [filters.storeName, filters.dateRange].join("｜");
+      }
+      if (state.activePage === "dailySales") {
+        return [filters.merchant, dailySelectedStoreLabel(pageState), filters.dateRange].join("｜");
+      }
+      return [filters.merchant, filters.dateRange].join("｜");
+    }
+
+    function getRows(page, pageState) {
+      let rows = page.data.records;
+      if (state.activePage === "dailySales") rows = getDailySalesRows(page, pageState);
+      if (page.type === "store") rows = filterStoreRows(rows, pageState);
+      if (page.type === "flat") rows = filterFlatRows(rows, pageState);
+      if (page.type === "store") {
+        rows = [...rows].sort((a, b) => sortValue(b, pageState.sortKey) - sortValue(a, pageState.sortKey));
+      }
+      return rows;
+    }
+
+    function filterStoreRows(rows, pageState) {
+      const filters = pageState.filters;
+      const keyword = filters.storeKeyword.toLowerCase();
+      return rows.filter(row => {
+        const typeMatch = filters.storeType === "全部" || row.storeType === filters.storeType;
+        const keywordMatch = !keyword || [row.storeNo, row.storeName, row.storeType].join(" ").toLowerCase().includes(keyword);
+        return typeMatch && keywordMatch;
+      });
+    }
+
+    function filterFlatRows(rows, pageState) {
+      const method = pageState.filters.paymentMethod;
+      return rows.filter(row => method === "全部" || row.paymentMethod === method);
+    }
+
+    function getDailySalesRows(page, pageState) {
+      const keyword = (pageState.filters.storeKeyword || "").trim();
+      if (!keyword) return page.data.records;
+      const store = findStoreRecord(keyword);
+      if (!store) return [];
+      return buildStoreDailyRows(page, store);
+    }
+
+    function findStoreRecord(keyword) {
+      const query = String(keyword || "").trim().toLowerCase();
+      if (!query) return null;
+      const records = pages.storeSales.data.records;
+      return records.find(row => row.storeNo.toLowerCase() === query || row.storeName.toLowerCase() === query)
+        || records.find(row => [row.storeNo, row.storeName, row.storeType].join(" ").toLowerCase().includes(query))
+        || null;
+    }
+
+    function dailySelectedStoreLabel(pageState) {
+      const keyword = (pageState.filters.storeKeyword || "").trim();
+      if (!keyword) return "全部门店";
+      const store = findStoreRecord(keyword);
+      return store ? store.storeName : `门店搜索：${keyword}`;
+    }
+
+    function buildStoreDailyRows(page, store) {
+      const cacheKey = store.storeNo;
+      if (dailyStoreRowsCache[cacheKey]) return dailyStoreRowsCache[cacheKey];
+
+      const rows = page.data.records.map(sourceRow => ({
+        dimensions: { ...sourceRow.dimensions },
+        channels: {},
+        subtotal: emptySummary(),
+        scopeLabel: store.storeName,
+      }));
+
+      for (const channel of page.data.channels) {
+        const source = store.channels[channel] || emptySummary();
+        const payCounts = distributeInteger(source.payCount, metricWeights(page, channel, "payCount"));
+        const payAmounts = distributeMoney(source.payAmount, metricWeights(page, channel, "payAmount"));
+        const refundCounts = distributeInteger(source.refundCount, metricWeights(page, channel, "refundCount"));
+        const refundAmounts = distributeMoney(source.refundAmount, metricWeights(page, channel, "refundAmount"));
+        const feeAmounts = distributeMoney(source.feeAmount, metricWeights(page, channel, "feeAmount"));
+
+        rows.forEach((row, index) => {
+          const item = {
+            payCount: payCounts[index],
+            payAmount: payAmounts[index],
+            refundCount: refundCounts[index],
+            refundAmount: refundAmounts[index],
+            feeAmount: feeAmounts[index],
+            netAmount: round2(payAmounts[index] + refundAmounts[index] - feeAmounts[index]),
+            tradeCount: payCounts[index] + refundCounts[index],
+          };
+          row.channels[channel] = item;
+          addSummary(row.subtotal, item);
+        });
+      }
+
+      rows.forEach(row => finalizeSummary(row.subtotal));
+      dailyStoreRowsCache[cacheKey] = rows;
+      return rows;
+    }
+
+    function metricWeights(page, channel, metricKey) {
+      let weights = page.data.records.map(row => Math.abs(row.channels[channel]?.[metricKey] || 0));
+      if (!weights.some(Boolean)) weights = page.data.records.map(row => Math.abs(row.subtotal.payAmount || 0));
+      if (!weights.some(Boolean)) weights = page.data.records.map(() => 1);
+      return weights;
+    }
+
+    function distributeInteger(total, weights) {
+      const sign = Number(total) < 0 ? -1 : 1;
+      const amount = Math.abs(Math.round(Number(total || 0)));
+      if (!amount) return weights.map(() => 0);
+      const safeWeights = weights.map(value => Number(value || 0));
+      const weightSum = safeWeights.reduce((sum, value) => sum + value, 0) || safeWeights.length;
+      const normalized = safeWeights.some(Boolean) ? safeWeights : safeWeights.map(() => 1);
+      const raw = normalized.map(value => amount * value / weightSum);
+      const base = raw.map(value => Math.floor(value));
+      let remainder = amount - base.reduce((sum, value) => sum + value, 0);
+      raw
+        .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+        .sort((a, b) => b.fraction - a.fraction)
+        .forEach(item => {
+          if (remainder > 0) {
+            base[item.index] += 1;
+            remainder -= 1;
+          }
+        });
+      return base.map(value => value * sign);
+    }
+
+    function distributeMoney(total, weights) {
+      const sign = Number(total) < 0 ? -1 : 1;
+      const cents = Math.abs(Math.round(Number(total || 0) * 100));
+      return distributeInteger(cents, weights).map(value => round2(sign * Math.abs(value) / 100));
+    }
+
+    function sortValue(row, sortKey) {
+      if (sortKey === "refundAbs") return Math.abs(row.subtotal.refundAmount);
+      return row.subtotal[sortKey] || 0;
+    }
+
+    function emptySummary() {
+      return {
+        payCount: 0,
+        payAmount: 0,
+        refundCount: 0,
+        refundAmount: 0,
+        feeAmount: 0,
+        netAmount: 0,
+        tradeCount: 0,
+      };
+    }
+
+    function addSummary(target, item) {
+      for (const key of Object.keys(target)) {
+        target[key] += Number(item[key] || 0);
+      }
+    }
+
+    function finalizeSummary(summary) {
+      summary.payAmount = round2(summary.payAmount);
+      summary.refundAmount = round2(summary.refundAmount);
+      summary.feeAmount = round2(summary.feeAmount);
+      summary.netAmount = round2(summary.netAmount);
+      return summary;
+    }
+
+    function summarizePage(page, rows) {
+      if (page.type === "flat") return summarizeFlat(rows, page.data.metrics);
+      const summary = emptySummary();
+      for (const row of rows) addSummary(summary, row.subtotal);
+      return finalizeSummary(summary);
+    }
+
+    function renderSummary(page, summary) {
+      const summaryStrip = $("#summaryStrip");
+      summaryStrip.classList.remove("is-hidden");
+      summaryStrip.classList.toggle("reconcile-summary", page.type === "flat");
+      if (page.type === "flat") {
+        renderReconcileSummary(summary);
+        return;
+      }
+
+      summaryStrip.innerHTML = page.summaryCards.map(card => {
+        const value = summary[card.key] || 0;
+        const note = card.noteKey ? `${number(summary[card.noteKey])} ${card.noteLabel}` : card.note;
+        return `
+          <div class="metric-cell">
+            <div class="metric-label">${h(card.label)}</div>
+            <div class="metric-value ${card.refund ? "refund" : ""} ${card.net ? "good" : ""}">${formatMetricValue(card, value)}</div>
+            <div class="metric-note">${h(note || "")}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderReconcileSummary(summary) {
+      const keyCards = [
+        { key: "交易金额", label: "交易金额", type: "money", note: `${number(summary["交易笔数"])} 笔交易` },
+        { key: "退款金额", label: "退款金额", type: "money", refund: true, note: `${number(summary["退款笔数"])} 笔退款` },
+        { key: "实收金额", label: "实收金额", type: "money", note: "扣减商户优惠和免充值优惠后金额" },
+        { key: "渠道手续费", label: "渠道手续费", type: "money", note: "支付渠道计收手续费" },
+        { key: "结算金额", label: "结算金额", type: "money", net: true, note: "实收金额 - 渠道手续费" },
+      ];
+
+      $("#summaryStrip").innerHTML = `
+        <div class="reconcile-card-grid">
+          ${keyCards.map(card => `
+            <div class="metric-cell">
+              <div class="metric-label">${h(card.label)}</div>
+              <div class="metric-value ${card.refund ? "refund" : ""} ${card.net ? "good" : ""}">${formatMetricValue(card, summary[card.key] || 0)}</div>
+              <div class="metric-note">${h(card.note || "")}</div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="formula-panel">
+          <div class="formula-title">金额组成关系</div>
+          <div class="formula-row">
+            ${formulaItem("交易金额", summary["交易金额"])}
+            <span class="formula-op">+</span>
+            ${formulaItem("退款金额", summary["退款金额"], { refund: true })}
+            <span class="formula-op">-</span>
+            ${formulaItem("商户优惠", summary["商户优惠"])}
+            <span class="formula-op">-</span>
+            ${formulaItem("商户免充值优惠", summary["商户免充值优惠"])}
+            <span class="formula-op">+</span>
+            ${formulaItem("调差金额", summary["调差金额"])}
+            <span class="formula-op">=</span>
+            ${formulaItem("实收金额", summary["实收金额"], { result: true, net: true })}
+          </div>
+          <div class="formula-row">
+            ${formulaItem("实收金额", summary["实收金额"], { result: true, net: true })}
+            <span class="formula-op">-</span>
+            ${formulaItem("渠道手续费", summary["渠道手续费"])}
+            <span class="formula-op">=</span>
+            ${formulaItem("结算金额", summary["结算金额"], { result: true, net: true })}
+          </div>
+          <div class="formula-note">
+            以下优惠只作为对账口径展示，不参与交易实收扣减。
+          </div>
+          <div class="formula-row">
+            ${formulaItem("支付渠道优惠", summary["支付渠道优惠"], { neutral: true })}
+            ${formulaItem("商户预充值优惠", summary["商户预充值优惠"], { neutral: true })}
+          </div>
+        </div>
+      `;
+    }
+
+    function formulaItem(label, value, options = {}) {
+      const itemClass = [
+        options.result ? "result" : "",
+        options.neutral ? "neutral" : "",
+      ].filter(Boolean).join(" ");
+      const valueClass = [
+        options.refund ? "negative" : "",
+        options.net ? "net-positive" : "",
+      ].filter(Boolean).join(" ");
+      return `
+        <div class="formula-item ${itemClass}">
+          <span>${h(label)}</span>
+          <strong class="${valueClass}">${money(value)}</strong>
+          ${options.note ? `<em>${h(options.note)}</em>` : ""}
+        </div>
+      `;
+    }
+
+    function renderStoreTable(page, rows) {
+      const headers = [
+        `<th class="sticky-dim">门店</th>`,
+        ...page.metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`),
+      ].join("");
+
+      const body = rows.map(row => {
+        const cells = page.metrics.map(metric => amountCell(row.subtotal, metric)).join("");
+        return `
+          <tr>
+            <td class="sticky-dim">
+              <button class="store-name-link" data-store-no="${h(row.storeNo)}" title="${h(row.storeName)}">${h(row.storeName)}</button>
+              <span class="store-meta">${h(row.storeNo)}｜${h(row.storeType)}</span>
+            </td>
+            ${cells}
+          </tr>
+        `;
+      }).join("");
+
+      $("#tableWrap").className = "table-wrap normal-table";
+      $("#tableWrap").innerHTML = `
+        <table>
+          <thead>
+            <tr class="single">${headers}</tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+
+      $$("#tableWrap [data-store-no]").forEach(button => {
+        button.onclick = () => openStoreDrawer(button.dataset.storeNo);
+      });
+    }
+
+    function renderSummaryDrilldownTable(page, rows) {
+      renderedRows[state.activePage] = rows;
+      const dimensions = page.data.dimensions;
+      const visibleDimensions = page.compactMetaKey ? dimensions.filter(dimension => dimension.key !== page.compactMetaKey) : dimensions;
+      const headers = [
+        ...visibleDimensions.map(dimension => `<th class="${dimension.fixed ? "sticky-dim" : "dimension-cell"}">${h(dimension.label)}</th>`),
+        ...page.metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`),
+      ].join("");
+
+      const body = rows.map((row, rowIndex) => {
+        const dimensionCells = visibleDimensions.map((dimension, dimensionIndex) => {
+          const fixedClass = dimension.fixed ? "sticky-dim" : "dimension-cell";
+          const value = row.dimensions[dimension.key];
+          if (dimensionIndex === 0) {
+            const metaValue = page.compactMetaKey ? row.dimensions[page.compactMetaKey] : "";
+            return `
+              <td class="${fixedClass}">
+                <button class="store-name-link" data-drill-row="${rowIndex}" title="${h(value)}">${h(value)}</button>
+                ${metaValue ? `<span class="store-meta">${h(metaValue)}</span>` : ""}
+              </td>
+            `;
+          }
+          return `<td class="${fixedClass}">${h(value)}</td>`;
+        }).join("");
+        const metricCells = page.metrics.map(metric => amountCell(row.subtotal, metric)).join("");
+        return `<tr>${dimensionCells}${metricCells}</tr>`;
+      }).join("");
+
+      $("#tableWrap").className = "table-wrap normal-table";
+      $("#tableWrap").innerHTML = `
+        <table>
+          <thead>
+            <tr class="single">${headers}</tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+
+      $$("#tableWrap [data-drill-row]").forEach(button => {
+        button.onclick = () => {
+          const row = renderedRows[state.activePage][Number(button.dataset.drillRow)];
+          openSalesBreakdownDrawer(state.activePage, row);
+        };
+      });
+    }
+
+    function renderPivotTable(page, rows) {
+      const dimensions = page.data.dimensions;
+      const metrics = page.metrics;
+      const summary = summarizePage(page, rows);
+
+      const dimensionHeaders = dimensions.map((dimension, index) => `
+        <th class="${dimension.fixed ? "sticky-dim" : "dimension-cell"}" rowspan="2">${h(dimension.label)}</th>
+      `).join("");
+      const groupHeaders = page.data.channels.map(channel => `<th colspan="${metrics.length}">${h(channel)}</th>`).join("");
+      const metricHeaders = page.data.channels.map(() => metrics.map(metric => `
+        <th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>
+      `).join("")).join("");
+      const subtotalMetricHeaders = metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`).join("");
+
+      const body = rows.map(row => {
+        const dimensionCells = dimensions.map(dimension => {
+          const fixedClass = dimension.fixed ? "sticky-dim" : "dimension-cell";
+          return `<td class="${fixedClass}">${h(row.dimensions[dimension.key])}</td>`;
+        }).join("");
+        const channelCells = page.data.channels.map(channel => metrics.map(metric => amountCell(row.channels[channel], metric)).join("")).join("");
+        const subtotalCells = metrics.map(metric => amountCell(row.subtotal, metric, "subtotal-cell")).join("");
+        return `<tr>${dimensionCells}${channelCells}${subtotalCells}</tr>`;
+      }).join("");
+
+      const footerLead = dimensions.map((dimension, index) => {
+        if (index === 0) return `<td class="${dimension.fixed ? "sticky-dim" : "dimension-cell"}">总计</td>`;
+        return `<td class="dimension-cell"></td>`;
+      }).join("");
+      const footerChannels = page.data.channels.map(channel => {
+        const channelSummary = summarizeChannel(rows, channel);
+        return metrics.map(metric => amountCell(channelSummary, metric, "subtotal-cell")).join("");
+      }).join("");
+      const footerSubtotal = metrics.map(metric => amountCell(summary, metric, "subtotal-cell")).join("");
+
+      $("#tableWrap").className = "table-wrap";
+      $("#tableWrap").innerHTML = `
+        <table>
+          <thead>
+            <tr class="group">
+              ${dimensionHeaders}
+              ${groupHeaders}
+              <th colspan="${metrics.length}">${h(page.subtotalLabel)}</th>
+            </tr>
+            <tr class="metric">
+              ${metricHeaders}
+              ${subtotalMetricHeaders}
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+          <tfoot>
+            <tr>${footerLead}${footerChannels}${footerSubtotal}</tr>
+          </tfoot>
+        </table>
+      `;
+    }
+
+    function summarizeChannel(rows, channel) {
+      const summary = emptySummary();
+      for (const row of rows) addSummary(summary, row.channels[channel]);
+      return finalizeSummary(summary);
+    }
+
+    function renderFlatTable(page, rows) {
+      const dimensions = page.data.dimensions;
+      const metrics = page.data.metrics;
+      const body = rows.map(row => {
+        const dimensionCells = dimensions.map(dimension => {
+          const fixedClass = dimension.fixed ? "sticky-dim" : "dimension-cell";
+          return `<td class="${fixedClass}">${h(row[dimension.key])}</td>`;
+        }).join("");
+        const metricCells = metrics.map(metric => metricFromLabel(row, metric)).join("");
+        return `<tr>${dimensionCells}${metricCells}</tr>`;
+      }).join("");
+
+      const header = [
+        ...dimensions.map(dimension => `<th class="${dimension.fixed ? "sticky-dim" : "dimension-cell"}">${h(dimension.label)}</th>`),
+        ...metrics.map(metric => `<th class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`),
+      ].join("");
+
+      $("#tableWrap").className = "table-wrap normal-table";
+      $("#tableWrap").innerHTML = `
+        <table>
+          <thead>
+            <tr class="single">${header}</tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+    }
+
+    function summarizeFlat(rows, metrics) {
+      const summary = {};
+      for (const metric of metrics) summary[metric.key] = 0;
+      for (const row of rows) {
+        for (const metric of metrics) summary[metric.key] += Number(row.metrics[metric.key] || 0);
+      }
+      for (const metric of metrics) {
+        if (metric.type === "money") summary[metric.key] = round2(summary[metric.key]);
+      }
+      return summary;
+    }
+
+    function openStoreDrawer(storeNo) {
+      const page = pages.storeSales;
+      const row = page.data.records.find(item => item.storeNo === storeNo);
+      if (!row) return;
+      $("#drawerTitle").textContent = row.storeName;
+      $("#drawerSub").textContent = `${row.storeNo}｜${row.storeType}｜${page.data.dateRange}`;
+
+      const channelRows = page.data.channels.map(channel => {
+        const item = row.channels[channel];
+        return `
+          <tr>
+            <td>${h(channel)}</td>
+            ${page.metrics.map(metric => amountCell(item, metric)).join("")}
+          </tr>
+        `;
+      }).join("");
+
+      $("#drawerBody").innerHTML = `
+        <div class="drawer-kpis">
+          <div class="drawer-kpi"><span>支付金额</span><strong>${money(row.subtotal.payAmount)}</strong></div>
+          <div class="drawer-kpi"><span>退款金额</span><strong class="refund">${money(row.subtotal.refundAmount)}</strong></div>
+          <div class="drawer-kpi"><span>手续费</span><strong>${money(row.subtotal.feeAmount)}</strong></div>
+          <div class="drawer-kpi"><span>净收金额</span><strong class="good">${money(row.subtotal.netAmount)}</strong></div>
+          <div class="drawer-kpi"><span>总交易笔数</span><strong>${number(row.subtotal.tradeCount)}</strong></div>
+        </div>
+        <div class="table-wrap single-head" style="height:auto;min-height:0;max-height:none;">
+          <table style="width:100%;min-width:860px;">
+            <thead>
+              <tr class="single">
+                <th style="position:static;text-align:left;">支付方式</th>
+                ${page.metrics.map(metric => `<th style="position:static;" class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>${channelRows}</tbody>
+          </table>
+        </div>
+      `;
+      $("#drawerMask").classList.add("open");
+    }
+
+    function openSalesBreakdownDrawer(pageId, row) {
+      const page = pages[pageId];
+      if (!page || !row) return;
+      const dimensions = page.data.dimensions;
+      const titleDimensions = page.compactMetaKey ? dimensions.filter(dimension => dimension.key !== page.compactMetaKey) : dimensions;
+      const title = titleDimensions.map(dimension => row.dimensions[dimension.key]).filter(Boolean).join("｜");
+      const metaValue = page.compactMetaKey ? row.dimensions[page.compactMetaKey] : "";
+      const sub = pageId === "storeTransactionSummary"
+        ? page.data.storeName
+        : pageId === "dailySales"
+        ? (row.scopeLabel || page.data.merchant)
+        : [metaValue, page.data.dateRange].filter(Boolean).join("｜");
+      $("#drawerTitle").textContent = title;
+      $("#drawerSub").textContent = sub;
+
+      const showStoreColumn = pageId === "dailySales" && Boolean(row.scopeLabel);
+      const channelRows = page.data.channels.map(channel => {
+        const item = row.channels[channel];
+        return `
+          <tr>
+            ${showStoreColumn ? `<td>${h(row.scopeLabel)}</td>` : ""}
+            <td>${h(channel)}</td>
+            ${page.metrics.map(metric => amountCell(item, metric)).join("")}
+          </tr>
+        `;
+      }).join("");
+
+      $("#drawerBody").innerHTML = `
+        ${renderDrawerKpis(page, row.subtotal)}
+        <div class="table-wrap single-head" style="height:auto;min-height:0;max-height:none;">
+          <table style="width:100%;min-width:860px;">
+            <thead>
+              <tr class="single">
+                ${showStoreColumn ? `<th style="position:static;text-align:left;">门店</th>` : ""}
+                <th style="position:static;text-align:left;">支付方式</th>
+                ${page.metrics.map(metric => `<th style="position:static;" class="${metric.type === "money" ? "amount-cell wide" : "num-cell"}">${h(metric.label)}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>${channelRows}</tbody>
+          </table>
+        </div>
+      `;
+      $("#drawerMask").classList.add("open");
+    }
+
+    function renderDrawerKpis(page, subtotal) {
+      if (!page.summaryCards) return "";
+      return `
+        <div class="drawer-kpis">
+          ${page.summaryCards.map(card => {
+            const value = subtotal[card.key] || 0;
+            return `
+              <div class="drawer-kpi">
+                <span>${h(card.label)}</span>
+                <strong class="${card.refund ? "refund" : ""} ${card.net ? "good" : ""}">${formatMetricValue(card, value)}</strong>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function exportCsv() {
+      const page = currentPage();
+      const pageState = currentPageState();
+      if (!pageState.hasQueried) {
+        showToast("请先查询");
+        return;
+      }
+      const rows = getRows(page, pageState);
+      if (!rows.length) {
+        showToast("当前没有可导出的结果");
+        return;
+      }
+
+      const lines = buildExportLines(page, rows);
+      const csv = lines.map(line => line.map(value => {
+        const text = String(value ?? "");
+        return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+      }).join(",")).join("\n");
+
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${page.title}-${page.data.dateRange}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast("已导出当前结果");
+    }
+
+    function buildExportLines(page, rows) {
+      if (page.type === "store") {
+        const header = ["门店号", "门店名称", "门店类型", ...page.metrics.map(metric => metric.label)];
+        const lines = [header];
+        for (const row of rows) {
+          lines.push([row.storeNo, row.storeName, row.storeType, ...page.metrics.map(metric => row.subtotal[metric.key])]);
+        }
+        return lines;
+      }
+
+      if (page.type === "summaryDrilldown") {
+        const header = [
+          ...page.data.dimensions.map(dimension => dimension.label),
+          ...page.metrics.map(metric => metric.label),
+        ];
+        const lines = [header];
+        for (const row of rows) {
+          lines.push([
+            ...page.data.dimensions.map(dimension => row.dimensions[dimension.key]),
+            ...page.metrics.map(metric => row.subtotal[metric.key]),
+          ]);
+        }
+        return lines;
+      }
+
+      if (page.type === "pivot") {
+        const header = [
+          ...page.data.dimensions.map(dimension => dimension.label),
+          ...page.data.channels.flatMap(channel => page.metrics.map(metric => `${channel}-${metric.label}`)),
+          ...page.metrics.map(metric => `${page.subtotalLabel}-${metric.label}`),
+        ];
+        const lines = [header];
+        for (const row of rows) {
+          lines.push([
+            ...page.data.dimensions.map(dimension => row.dimensions[dimension.key]),
+            ...page.data.channels.flatMap(channel => page.metrics.map(metric => row.channels[channel][metric.key])),
+            ...page.metrics.map(metric => row.subtotal[metric.key]),
+          ]);
+        }
+        return lines;
+      }
+
+      const header = [
+        ...page.data.dimensions.map(dimension => dimension.label),
+        ...page.data.metrics.map(metric => metric.label),
+      ];
+      const lines = [header];
+      for (const row of rows) {
+        lines.push([
+          ...page.data.dimensions.map(dimension => row[dimension.key]),
+          ...page.data.metrics.map(metric => row.metrics[metric.key]),
+        ]);
+      }
+      return lines;
+    }
+
+    function showToast(message) {
+      const toast = $("#toast");
+      toast.textContent = message;
+      toast.classList.add("open");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("open"), 1800);
+    }
+
+    $$(".side-link").forEach(button => {
+      button.onclick = () => {
+        if (!button.dataset.page) return;
+        state.activePage = button.dataset.page;
+        renderPage();
+      };
+    });
+
+    $("#filterGrid").addEventListener("input", handleFilterChange);
+    $("#filterGrid").addEventListener("change", handleFilterChange);
+    $("#sortSelect").onchange = event => {
+      const pageState = currentPageState();
+      pageState.sortKey = event.target.value;
+      if (pageState.hasQueried) renderResult();
+    };
+    $("#exportBtn").onclick = exportCsv;
+    $("#drawerClose").onclick = () => $("#drawerMask").classList.remove("open");
+    $("#drawerMask").onclick = event => {
+      if (event.target.id === "drawerMask") $("#drawerMask").classList.remove("open");
+    };
+
+    renderPage();
+  </script>
+</body>
+</html>
