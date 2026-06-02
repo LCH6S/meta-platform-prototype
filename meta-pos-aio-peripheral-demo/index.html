@@ -1307,90 +1307,6 @@
       opacity: .45;
     }
 
-    .payload-box,
-    .response-box {
-      margin: 0;
-      min-height: 106px;
-      border-radius: 8px;
-      background: #070a10;
-      border: 1px solid rgba(255, 255, 255, .1);
-      padding: 10px;
-      color: #d8e4f5;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 11px;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      overflow: auto;
-    }
-
-    .response-box {
-      min-height: 74px;
-      color: #b9f6d0;
-    }
-
-    .log-stream {
-      display: grid;
-      gap: 8px;
-      max-height: 220px;
-      overflow: auto;
-      scrollbar-width: thin;
-    }
-
-    .log-entry {
-      border-radius: 8px;
-      background: rgba(255, 255, 255, .055);
-      border-left: 3px solid rgba(8, 174, 234, .86);
-      padding: 8px 10px;
-      font-size: 11px;
-      line-height: 1.45;
-      color: #c9d4e4;
-    }
-
-    .log-entry.reject {
-      border-left-color: #ef4444;
-    }
-
-    .log-entry.success {
-      border-left-color: #08a667;
-    }
-
-    .log-time {
-      color: #7f8a9b;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    }
-
-    .journey-list {
-      display: grid;
-      gap: 9px;
-      margin-top: 12px;
-    }
-
-    .journey-step {
-      display: grid;
-      grid-template-columns: 22px minmax(0, 1fr);
-      gap: 9px;
-      font-size: 13px;
-      color: #a9b3c2;
-      line-height: 1.45;
-    }
-
-    .journey-step::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #d7dae0;
-      margin: 5px auto 0;
-    }
-
-    .journey-step.done {
-      color: #f8fafc;
-    }
-
-    .journey-step.done::before {
-      background: #08a667;
-    }
-
     .note {
       margin-top: 12px;
       border-radius: 10px;
@@ -1660,7 +1576,7 @@
       <div class="console-header">
         <div>
           <h1 class="console-title">AIO 指令控制台</h1>
-          <p class="console-subtitle">模拟 AIO 向 Meta POS 外设模式下发控制指令，并查看 Meta POS 的响应。</p>
+          <p class="console-subtitle">模拟 AIO 向 Meta POS 外设模式下发业务指令，驱动左侧 POS 页面演示。</p>
         </div>
         <div class="console-badge">AIO</div>
       </div>
@@ -1688,16 +1604,6 @@
       </div>
 
       <div class="console-section">
-        <h2 class="section-title">当前请求 Payload</h2>
-        <pre class="payload-box" data-payload-preview>{}</pre>
-      </div>
-
-      <div class="console-section">
-        <h2 class="section-title">Meta POS 响应</h2>
-        <pre class="response-box" data-response-preview>{}</pre>
-      </div>
-
-      <div class="console-section">
         <h2 class="section-title">Meta POS / 回执模拟</h2>
         <div class="tool-grid">
           <button class="tool-button green" data-action="go-peripheral">进入外设首页<small>需先输入管理密码</small></button>
@@ -1708,23 +1614,6 @@
           <button class="tool-button" data-action="read-timeout">读卡超时<small>AIO 需重新发起</small></button>
           <button class="tool-button red" data-action="task-busy">模拟忙碌<small>并发任务被拒绝</small></button>
           <button class="tool-button" data-action="reset-demo">重置 Demo<small>回到标准模式</small></button>
-          <button class="tool-button" data-action="clear-console-log">清空日志<small>仅清控制台</small></button>
-        </div>
-      </div>
-
-      <div class="console-section">
-        <h2 class="section-title">指令日志</h2>
-        <div class="log-stream" data-console-log></div>
-      </div>
-
-      <div class="console-section">
-        <h2 class="section-title">主链路进度</h2>
-        <div class="journey-list">
-          <div class="journey-step" data-step="mode">实施 / 运维人员切换外设模式</div>
-          <div class="journey-step" data-step="read">AIO 发起读卡，Meta POS 返回读卡结果</div>
-          <div class="journey-step" data-step="pay">AIO 发起银行卡支付，通华返回结果</div>
-          <div class="journey-step" data-step="preauth">AIO 发起银行卡预授权，通华返回结果</div>
-          <div class="journey-step" data-step="ops">隐藏入口进入设置并可切回标准模式</div>
         </div>
       </div>
     </aside>
@@ -2044,24 +1933,9 @@
     }
 
     function renderConsole() {
-      const payloadPreview = document.querySelector("[data-payload-preview]");
-      const responsePreview = document.querySelector("[data-response-preview]");
-      const logStream = document.querySelector("[data-console-log]");
-      if (!payloadPreview || !responsePreview || !logStream) return;
-
-      payloadPreview.textContent = JSON.stringify(state.currentPayload || buildPayload(state.selectedCommand), null, 2);
-      responsePreview.textContent = JSON.stringify(state.lastResponse, null, 2);
-
       document.querySelectorAll("[data-command]").forEach((button) => {
         button.classList.toggle("active", button.dataset.command === state.selectedCommand);
       });
-
-      logStream.innerHTML = state.logs.map((entry) => `
-        <div class="log-entry ${entry.kind}">
-          <div><span class="log-time">${entry.time}</span> ${entry.title}</div>
-          <div>${entry.message}</div>
-        </div>
-      `).join("");
     }
 
     function pushLog(kind, title, message) {
@@ -2486,10 +2360,6 @@
           };
           pushLog("success", "Meta POS -> AIO", state.currentAcqType === "preauth" ? "预授权成功" : "支付成功");
           updateChrome();
-          break;
-        case "clear-console-log":
-          state.logs = [];
-          renderConsole();
           break;
         default:
           break;
