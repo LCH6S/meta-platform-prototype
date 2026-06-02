@@ -1,0 +1,2528 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Meta POS 外设模式 AIO 高保真 Demo</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --device-w: 720px;
+      --device-h: 1600px;
+      --scale: 0.58;
+      --bg: #101116;
+      --panel: #ffffff;
+      --panel-soft: #f6f7f9;
+      --line: #e7e8eb;
+      --text: #1f2329;
+      --muted: #71767f;
+      --dark: #191a22;
+      --brand: #08aeea;
+      --accent: #06ae57;
+      --danger: #ff3b3b;
+      --warning: #f6a609;
+      --radius: 14px;
+      --shadow: 0 22px 60px rgba(0, 0, 0, .28);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 16%, rgba(52, 92, 146, .38), transparent 30%),
+        linear-gradient(135deg, #11131a 0%, #20232c 100%);
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .demo-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(420px, calc(var(--device-w) * var(--scale))) 420px;
+      gap: 22px;
+      align-items: start;
+      justify-content: center;
+      padding: 28px;
+    }
+
+    .device-stage {
+      width: calc(var(--device-w) * var(--scale));
+      height: calc(var(--device-h) * var(--scale));
+      position: sticky;
+      top: 28px;
+    }
+
+    .device {
+      width: var(--device-w);
+      height: var(--device-h);
+      position: relative;
+      overflow: hidden;
+      background: #fff;
+      border-radius: 34px;
+      box-shadow: var(--shadow);
+      transform: scale(var(--scale));
+      transform-origin: top left;
+    }
+
+    .device::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 10px solid #111217;
+      border-radius: 34px;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .full-screen-image {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      background: #fff;
+    }
+
+    .hotspot {
+      position: absolute;
+      border: 0;
+      background: transparent;
+      color: transparent;
+      padding: 0;
+      z-index: 20;
+    }
+
+    .standard-gear {
+      top: 112px;
+      right: 18px;
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+    }
+
+    .statusbar {
+      height: 48px;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 0 22px;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .statusbar.light {
+      background: #fff;
+      color: #17191f;
+      border-bottom: 1px solid #f1f1f1;
+    }
+
+    .android-icons {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .wifi {
+      width: 18px;
+      height: 14px;
+      border-radius: 18px 18px 0 0;
+      border-top: 8px solid currentColor;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      opacity: .92;
+    }
+
+    .battery {
+      width: 22px;
+      height: 12px;
+      border: 2px solid currentColor;
+      position: relative;
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -5px;
+      top: 3px;
+      width: 3px;
+      height: 6px;
+      background: currentColor;
+    }
+
+    .top-nav {
+      height: 96px;
+      background: #fff;
+      border-bottom: 1px solid #e7e8eb;
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr) 96px;
+      align-items: center;
+      color: #24262b;
+    }
+
+    .nav-title {
+      text-align: center;
+      font-size: 36px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .back-button {
+      width: 72px;
+      height: 72px;
+      margin-left: 12px;
+      background: transparent;
+      position: relative;
+    }
+
+    .back-button::before {
+      content: "";
+      position: absolute;
+      left: 29px;
+      top: 20px;
+      width: 25px;
+      height: 25px;
+      border-left: 4px solid #202124;
+      border-bottom: 4px solid #202124;
+      transform: rotate(45deg);
+      border-radius: 2px;
+    }
+
+    .settings-body {
+      height: calc(100% - 144px);
+      background: #f5f6f8;
+      padding: 20px 24px;
+    }
+
+    .settings-list {
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .settings-row {
+      height: 100px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 42px;
+      align-items: center;
+      padding: 0 24px;
+      background: #fff;
+      border-bottom: 1px solid #e1e3e6;
+      text-align: left;
+      color: #45474b;
+      font-size: 30px;
+      font-weight: 400;
+    }
+
+    .settings-row:last-child {
+      border-bottom: 0;
+    }
+
+    .chevron {
+      width: 22px;
+      height: 22px;
+      justify-self: end;
+      border-top: 4px solid #a3a6aa;
+      border-right: 4px solid #a3a6aa;
+      transform: rotate(45deg);
+    }
+
+    .mode-body {
+      height: calc(100% - 144px);
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 32px 32px;
+    }
+
+    .mode-content {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: 40px;
+    }
+
+    .mode-illustration {
+      width: 370px;
+      height: 230px;
+      position: relative;
+      margin-bottom: 36px;
+    }
+
+    .mode-aio-screen {
+      position: absolute;
+      left: 18px;
+      bottom: 28px;
+      width: 274px;
+      height: 220px;
+      border: 9px solid #464646;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .mode-aio-screen::before {
+      content: "";
+      position: absolute;
+      inset: 16px;
+      background:
+        linear-gradient(#e9ebef 0 10px, transparent 10px 18px, #e9ebef 18px 28px, transparent 28px) 16px 8px / 62px 46px no-repeat,
+        linear-gradient(#e9ebef 0 20px, transparent 20px) right 14px top 12px / 56px 20px no-repeat,
+        linear-gradient(90deg, #e9ebef 0 60px, transparent 60px 74px, #e9ebef 74px 136px, transparent 136px 150px, #e9ebef 150px 212px) left 16px top 82px / 212px 88px no-repeat,
+        linear-gradient(#e9ebef 0 8px, transparent 8px) center bottom 10px / 56px 8px no-repeat,
+        #f8f8f9;
+    }
+
+    .mode-pos-device {
+      position: absolute;
+      right: 8px;
+      bottom: 30px;
+      width: 80px;
+      height: 170px;
+      border: 6px solid #484848;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 6px 0 0 #333;
+    }
+
+    .mode-pos-device::before {
+      content: "";
+      position: absolute;
+      left: -6px;
+      right: -6px;
+      top: -6px;
+      height: 44px;
+      border-radius: 8px 8px 2px 2px;
+      border: 6px solid #484848;
+      border-bottom: 0;
+      background: #7d7e80;
+    }
+
+    .mode-pos-device::after {
+      content: "收钱吧";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 85px;
+      color: #1e293b;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .mode-contactless {
+      position: absolute;
+      right: 28px;
+      top: 35px;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,.78);
+      border-left-color: transparent;
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      transform: rotate(45deg);
+      z-index: 2;
+    }
+
+    .mode-copy {
+      width: 610px;
+      max-width: 100%;
+      margin: 0;
+      color: #686868;
+      text-align: center;
+      font-size: 29px;
+      line-height: 1.45;
+      font-weight: 400;
+    }
+
+    .mode-primary-button {
+      width: 100%;
+      height: 96px;
+      border-radius: 48px;
+      background: #1c1d24;
+      color: #fff;
+      font-size: 31px;
+      font-weight: 600;
+      flex: 0 0 auto;
+    }
+
+    .communication-body {
+      height: calc(100% - 144px);
+      background: #f5f6f8;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .communication-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 28px 24px 30px;
+      border: 1px solid #eceef1;
+    }
+
+    .communication-label {
+      display: block;
+      margin-bottom: 18px;
+      color: #555961;
+      font-size: 28px;
+      line-height: 1.35;
+    }
+
+    .communication-input {
+      width: 100%;
+      height: 88px;
+      border: 2px solid #dfe2e7;
+      border-radius: 8px;
+      padding: 0 22px;
+      color: #202124;
+      background: #fff;
+      font-size: 28px;
+      line-height: 1.2;
+      outline: none;
+    }
+
+    .communication-input[readonly] {
+      color: #3f444b;
+      background: #f7f8fa;
+    }
+
+    .communication-input:focus {
+      border-color: #1c1d24;
+    }
+
+    .communication-actions {
+      margin-top: auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .communication-edit-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .communication-edit-actions[hidden] {
+      display: none;
+    }
+
+    .communication-feedback {
+      min-height: 34px;
+      margin: 0;
+      color: #06ae57;
+      text-align: center;
+      font-size: 24px;
+      line-height: 1.4;
+    }
+
+    .communication-feedback.error {
+      color: #e54848;
+    }
+
+    .primary-button,
+    .secondary-button,
+    .danger-button {
+      height: 78px;
+      width: 100%;
+      border-radius: 8px;
+      color: #fff;
+      background: #1c1d24;
+      font-size: 30px;
+      font-weight: 600;
+    }
+
+    .secondary-button {
+      color: #202124;
+      background: #f0f1f3;
+    }
+
+    .danger-button {
+      background: #e54848;
+    }
+
+    .password-body {
+      height: calc(100% - 144px);
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 80px 52px 42px;
+    }
+
+    .password-title {
+      margin: 0;
+      text-align: center;
+      color: #17191f;
+      font-size: 34px;
+      line-height: 1.35;
+      font-weight: 600;
+    }
+
+    .password-subtitle {
+      margin: 16px 0 56px;
+      text-align: center;
+      color: #8a8d93;
+      font-size: 24px;
+      line-height: 1.35;
+    }
+
+    .pin-dots {
+      height: 72px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 22px;
+      margin-bottom: 76px;
+    }
+
+    .pin-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #d8dadd;
+    }
+
+    .pin-dot.filled {
+      background: #1f2329;
+    }
+
+    .keypad {
+      margin-top: auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px 22px;
+    }
+
+    .key {
+      height: 92px;
+      border-radius: 10px;
+      background: #f4f5f7;
+      color: #202124;
+      font-size: 34px;
+      font-weight: 500;
+    }
+
+    .key:active,
+    .settings-row:active,
+    .primary-button:active,
+    .mode-primary-button:active,
+    .secondary-button:active {
+      filter: brightness(.94);
+    }
+
+    .peripheral-page {
+      background: #fff;
+    }
+
+    .poster {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .hidden-entry-zone {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 150px;
+    }
+
+    .tap-progress {
+      position: absolute;
+      top: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 210px;
+      height: 50px;
+      border-radius: 25px;
+      background: rgba(0, 0, 0, .5);
+      color: #fff;
+      display: none;
+      place-items: center;
+      padding: 0 24px;
+      font-size: 22px;
+      z-index: 25;
+    }
+
+    .tap-progress.visible {
+      display: grid;
+    }
+
+    .read-processing {
+      height: calc(100% - 48px);
+      background: #fff;
+      color: #101722;
+    }
+
+    .read-processing-content {
+      height: calc(100% - 96px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: 120px;
+    }
+
+    .read-loading {
+      width: 116px;
+      height: 116px;
+      border-radius: 50%;
+      border: 8px solid #eef1f4;
+      border-top-color: var(--accent);
+      margin-bottom: 36px;
+      animation: spin 1s linear infinite;
+    }
+
+    .read-processing-title {
+      font-size: 30px;
+      line-height: 1.35;
+      color: #17191f;
+      font-weight: 600;
+    }
+
+    .read-result {
+      height: calc(100% - 48px);
+      background: #fff;
+      color: #101722;
+    }
+
+    .read-processing .result-nav,
+    .read-result .result-nav {
+      height: 96px;
+      display: grid;
+      grid-template-columns: 120px minmax(0,1fr) 120px;
+      align-items: center;
+      border-bottom: 1px solid #f0f1f2;
+    }
+
+    .read-result .result-countdown {
+      grid-column: 3;
+      color: #111;
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .read-result-content {
+      height: calc(100% - 96px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 300px;
+    }
+
+    .circle-icon {
+      width: 118px;
+      height: 118px;
+      border: 8px solid var(--accent);
+      border-radius: 50%;
+      position: relative;
+      margin-bottom: 36px;
+    }
+
+    .circle-icon::before {
+      content: "";
+      position: absolute;
+      left: 32px;
+      top: 30px;
+      width: 48px;
+      height: 28px;
+      border-left: 8px solid var(--accent);
+      border-bottom: 8px solid var(--accent);
+      transform: rotate(-45deg);
+      border-radius: 3px;
+    }
+
+    .circle-icon.error {
+      border-color: var(--danger);
+    }
+
+    .circle-icon.error::before,
+    .circle-icon.error::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 28px;
+      width: 8px;
+      height: 56px;
+      border: 0;
+      background: var(--danger);
+      transform: translateX(-50%) rotate(45deg);
+      border-radius: 4px;
+    }
+
+    .circle-icon.error::after {
+      transform: translateX(-50%) rotate(-45deg);
+    }
+
+    .circle-icon.timeout {
+      border-color: var(--warning);
+    }
+
+    .circle-icon.timeout::before {
+      left: 51px;
+      top: 23px;
+      width: 8px;
+      height: 42px;
+      border: 0;
+      background: var(--warning);
+      transform: none;
+      border-radius: 4px;
+    }
+
+    .circle-icon.timeout::after {
+      content: "";
+      position: absolute;
+      left: 52px;
+      top: 73px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--warning);
+    }
+
+    .result-title {
+      font-size: 28px;
+      line-height: 1.35;
+      color: #17191f;
+      margin-bottom: 22px;
+    }
+
+    .result-detail {
+      width: 520px;
+      border-radius: 10px;
+      background: #f6f7f9;
+      padding: 22px 28px;
+      color: #5e646f;
+      font-size: 23px;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .result-actions {
+      width: 600px;
+      margin-top: auto;
+      margin-bottom: 70px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .read-timer-override {
+      position: absolute;
+      top: 52px;
+      right: 12px;
+      width: 142px;
+      height: 62px;
+      z-index: 24;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #ff3b3b;
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    .read-toast {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: none;
+      place-items: center;
+      background: rgba(0, 0, 0, .18);
+      padding: 0 72px;
+    }
+
+    .read-toast.visible {
+      display: grid;
+      animation: toastIn .16s ease-out;
+    }
+
+    .read-dialog {
+      width: 500px;
+      min-height: 250px;
+      border-radius: 18px;
+      background: #fff;
+      color: #17191f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 34px;
+      box-shadow: 0 22px 56px rgba(0, 0, 0, .18);
+    }
+
+    .toast-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #ff5a5a;
+      color: #fff;
+      font-size: 38px;
+      line-height: 1;
+      font-weight: 800;
+      margin-bottom: 22px;
+    }
+
+    .toast-title {
+      font-size: 30px;
+      line-height: 1.25;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .toast-copy {
+      font-size: 19px;
+      line-height: 1.35;
+      color: rgba(255, 255, 255, .78);
+    }
+
+    @keyframes toastIn {
+      from {
+        transform: scale(.96);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .acq-screen {
+      background: #e7f8ff;
+      color: #163246;
+    }
+
+    .acq-top {
+      height: 116px;
+      background: #08aeea;
+      color: rgba(255,255,255,.92);
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) 160px;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
+    }
+
+    .acq-top .back-button::before {
+      border-color: rgba(255,255,255,.86);
+    }
+
+    .acq-title {
+      text-align: center;
+      font-size: 34px;
+      font-weight: 500;
+      letter-spacing: 2px;
+    }
+
+    .acq-timer {
+      justify-self: center;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 32px;
+      font-weight: 500;
+    }
+
+    .hourglass {
+      width: 30px;
+      height: 42px;
+      position: relative;
+      border-top: 5px solid currentColor;
+      border-bottom: 5px solid currentColor;
+    }
+
+    .hourglass::before,
+    .hourglass::after {
+      content: "";
+      position: absolute;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      border-left: 4px solid currentColor;
+      border-bottom: 4px solid currentColor;
+    }
+
+    .hourglass::before {
+      top: 0;
+      transform: rotate(-45deg);
+    }
+
+    .hourglass::after {
+      bottom: 0;
+      transform: rotate(135deg);
+    }
+
+    .acq-body {
+      padding: 58px 55px 64px;
+      height: calc(100% - 116px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .amount-card {
+      height: 250px;
+      background: rgba(255,255,255,.4);
+      border-radius: 8px;
+      box-shadow: 0 6px 14px rgba(0, 120, 170, .08);
+      padding: 34px 24px;
+      margin-bottom: 64px;
+    }
+
+    .amount-card .label {
+      font-size: 38px;
+      color: rgba(34, 64, 84, .48);
+      margin-bottom: 36px;
+    }
+
+    .amount-card .value {
+      color: #142c40;
+      font-size: 86px;
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    .acq-instruction {
+      font-size: 42px;
+      line-height: 1.26;
+      color: rgba(22, 50, 70, .76);
+      margin-bottom: 34px;
+    }
+
+    .card-input {
+      height: 88px;
+      width: 100%;
+      border: 2px solid #1eb3e6;
+      border-radius: 6px;
+      background: rgba(255,255,255,.38);
+      color: #139bd0;
+      font-size: 40px;
+      padding: 0 22px;
+      margin-bottom: 82px;
+      display: flex;
+      align-items: center;
+    }
+
+    .contactless {
+      width: 430px;
+      height: 240px;
+      margin: 0 auto 96px;
+      color: #0aaee7;
+      position: relative;
+    }
+
+    .contactless .ring {
+      position: absolute;
+      left: 40px;
+      top: 36px;
+      width: 240px;
+      height: 160px;
+      border: 8px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .contactless .wave {
+      position: absolute;
+      left: 96px;
+      top: 77px;
+      width: 90px;
+      height: 90px;
+      border-right: 11px solid currentColor;
+      border-radius: 50%;
+    }
+
+    .contactless .wave:nth-child(2) {
+      left: 64px;
+      width: 140px;
+      height: 126px;
+      top: 58px;
+    }
+
+    .contactless .wave:nth-child(3) {
+      left: 34px;
+      width: 190px;
+      height: 156px;
+      top: 44px;
+    }
+
+    .contactless .card-shape {
+      position: absolute;
+      right: 36px;
+      top: 62px;
+      width: 160px;
+      height: 92px;
+      border: 8px solid currentColor;
+      border-radius: 12px;
+      transform: rotate(39deg);
+      background: #e7f8ff;
+    }
+
+    .contactless .hand {
+      position: absolute;
+      right: 28px;
+      bottom: 8px;
+      width: 170px;
+      height: 82px;
+      border: 8px solid currentColor;
+      border-top: 0;
+      border-radius: 0 0 60px 60px;
+      transform: rotate(39deg);
+    }
+
+    .acq-button {
+      height: 92px;
+      width: 100%;
+      margin-top: auto;
+      background: #08aeea;
+      color: rgba(255,255,255,.9);
+      font-size: 40px;
+      font-weight: 500;
+      border-radius: 4px;
+      box-shadow: 0 5px 12px rgba(0, 126, 190, .18);
+    }
+
+    .processing-copy {
+      margin-top: 310px;
+      text-align: left;
+      color: rgba(22, 50, 70, .78);
+      font-size: 44px;
+      line-height: 1.3;
+    }
+
+    .processing-card {
+      margin-top: 34px;
+      height: 90px;
+      border: 2px solid #1eb3e6;
+      border-radius: 6px;
+      background: rgba(255,255,255,.35);
+      color: #139bd0;
+      font-size: 38px;
+      display: flex;
+      align-items: center;
+      padding-left: 24px;
+    }
+
+    .receiving-body {
+      height: calc(100% - 116px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 390px;
+    }
+
+    .receiving-mark {
+      width: 230px;
+      height: 230px;
+      border-radius: 50%;
+      position: relative;
+      border: 5px solid rgba(0, 170, 226, .48);
+      margin-bottom: 44px;
+    }
+
+    .receiving-mark::before {
+      content: "";
+      position: absolute;
+      left: 50px;
+      top: 58px;
+      width: 118px;
+      height: 86px;
+      border-radius: 52px 52px 48px 48px;
+      border: 28px solid #08aeea;
+      border-right-width: 36px;
+      box-sizing: border-box;
+    }
+
+    .receiving-mark::after {
+      content: "";
+      position: absolute;
+      right: 44px;
+      top: 42px;
+      width: 42px;
+      height: 142px;
+      border-radius: 22px;
+      background: #08aeea;
+    }
+
+    .receiving-time {
+      font-size: 54px;
+      color: #112236;
+      font-weight: 700;
+      margin-bottom: 36px;
+    }
+
+    .receiving-text {
+      font-size: 40px;
+      color: rgba(22, 50, 70, .68);
+    }
+
+    .acq-result-body {
+      height: calc(100% - 116px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 300px 56px 64px;
+    }
+
+    .acq-check {
+      width: 220px;
+      height: 220px;
+      border: 8px solid #08aeea;
+      border-radius: 50%;
+      position: relative;
+      margin-bottom: 74px;
+    }
+
+    .acq-check::before {
+      content: "";
+      position: absolute;
+      left: 58px;
+      top: 56px;
+      width: 88px;
+      height: 48px;
+      border-left: 13px solid #08aeea;
+      border-bottom: 13px solid #08aeea;
+      transform: rotate(-45deg);
+      border-radius: 4px;
+    }
+
+    .acq-result-title {
+      font-size: 42px;
+      color: rgba(22, 50, 70, .78);
+      margin-bottom: auto;
+    }
+
+    .aio-console {
+      background: rgba(15, 17, 24, .96);
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-top: 7px solid #ef4444;
+      border-radius: 10px;
+      box-shadow: 0 20px 56px rgba(0, 0, 0, .28);
+      color: #eef2f7;
+      padding: 16px;
+      position: sticky;
+      top: 28px;
+      max-height: calc(100vh - 56px);
+      overflow: auto;
+      scrollbar-width: none;
+    }
+
+    .aio-console::-webkit-scrollbar {
+      display: none;
+    }
+
+    .console-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .console-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .console-subtitle {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #a9b3c2;
+    }
+
+    .console-badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: rgba(8, 166, 103, .16);
+      border: 1px solid rgba(8, 166, 103, .45);
+      color: #48dc9a;
+      padding: 5px 9px;
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 800;
+    }
+
+    .console-section {
+      padding-top: 14px;
+      margin-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    .console-section:first-of-type {
+      border-top: 0;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      color: #dce6f4;
+      font-size: 13px;
+      line-height: 1.3;
+      font-weight: 800;
+    }
+
+    .console-state-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .state-line {
+      min-height: 54px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .055);
+      border: 1px solid rgba(255, 255, 255, .08);
+      padding: 9px 10px;
+      font-size: 13px;
+    }
+
+    .state-line span:first-child {
+      display: block;
+      margin-bottom: 4px;
+      color: #8e99aa;
+      font-size: 11px;
+    }
+
+    .state-line strong {
+      color: #f8fafc;
+      font-weight: 800;
+    }
+
+    .command-grid,
+    .tool-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .command-button,
+    .tool-button {
+      min-height: 44px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .08);
+      border: 1px solid rgba(255, 255, 255, .1);
+      color: #fff;
+      padding: 9px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      text-align: left;
+    }
+
+    .command-button small,
+    .tool-button small {
+      display: block;
+      margin-top: 4px;
+      color: rgba(255, 255, 255, .58);
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .command-button:hover,
+    .tool-button:hover,
+    .command-button.active {
+      border-color: rgba(8, 174, 234, .85);
+      background: rgba(8, 174, 234, .18);
+    }
+
+    .command-button.primary {
+      background: rgba(8, 174, 234, .2);
+      border-color: rgba(8, 174, 234, .5);
+    }
+
+    .tool-button.green {
+      background: rgba(8, 166, 103, .18);
+      border-color: rgba(8, 166, 103, .42);
+    }
+
+    .tool-button.red {
+      background: rgba(239, 68, 68, .18);
+      border-color: rgba(239, 68, 68, .42);
+    }
+
+    .command-button:disabled,
+    .tool-button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    .payload-box,
+    .response-box {
+      margin: 0;
+      min-height: 106px;
+      border-radius: 8px;
+      background: #070a10;
+      border: 1px solid rgba(255, 255, 255, .1);
+      padding: 10px;
+      color: #d8e4f5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow: auto;
+    }
+
+    .response-box {
+      min-height: 74px;
+      color: #b9f6d0;
+    }
+
+    .log-stream {
+      display: grid;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    .log-entry {
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .055);
+      border-left: 3px solid rgba(8, 174, 234, .86);
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #c9d4e4;
+    }
+
+    .log-entry.reject {
+      border-left-color: #ef4444;
+    }
+
+    .log-entry.success {
+      border-left-color: #08a667;
+    }
+
+    .log-time {
+      color: #7f8a9b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .journey-list {
+      display: grid;
+      gap: 9px;
+      margin-top: 12px;
+    }
+
+    .journey-step {
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 9px;
+      font-size: 13px;
+      color: #a9b3c2;
+      line-height: 1.45;
+    }
+
+    .journey-step::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d7dae0;
+      margin: 5px auto 0;
+    }
+
+    .journey-step.done {
+      color: #f8fafc;
+    }
+
+    .journey-step.done::before {
+      background: #08a667;
+    }
+
+    .note {
+      margin-top: 12px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .055);
+      padding: 12px;
+      color: #a9b3c2;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 980px) {
+      .demo-shell {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+
+      .aio-console {
+        width: min(720px, 100%);
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="demo-shell">
+    <section class="device-stage" aria-label="Meta POS 设备画布">
+      <div class="device" id="device">
+        <section class="screen active" data-screen="standard" aria-label="标准模式首页">
+          <img class="full-screen-image" src="assets/metapos标准模式首页.jpg" alt="Meta POS 标准模式首页">
+          <button class="hotspot standard-gear" data-action="open-settings" aria-label="打开设置"></button>
+        </section>
+
+        <section class="screen" data-screen="settings" aria-label="设置页">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="top-nav">
+            <button class="back-button" data-action="settings-back" aria-label="返回"></button>
+            <div class="nav-title">设置</div>
+            <div></div>
+          </div>
+          <div class="settings-body">
+            <div class="settings-list">
+              <button class="settings-row"><span>签到</span><span class="chevron"></span></button>
+              <button class="settings-row"><span>银行卡设置</span><span class="chevron"></span></button>
+              <button class="settings-row"><span>语言</span><span class="chevron"></span></button>
+              <button class="settings-row"><span>应用商店</span><span class="chevron"></span></button>
+              <button class="settings-row" data-action="mode-detail"><span>外设模式</span><span class="chevron"></span></button>
+              <button class="settings-row" data-action="communication-settings"><span>通讯设置</span><span class="chevron"></span></button>
+              <button class="settings-row"><span>设备信息</span><span class="chevron"></span></button>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="mode-detail" aria-label="外设模式详情">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="top-nav">
+            <button class="back-button" data-action="open-settings" aria-label="返回设置"></button>
+            <div class="nav-title">外设模式</div>
+            <div></div>
+          </div>
+          <div class="mode-body">
+            <div class="mode-content">
+              <h2 class="visually-hidden" data-mode-title>外设模式</h2>
+              <div class="mode-illustration" aria-hidden="true">
+                <div class="mode-aio-screen"></div>
+                <div class="mode-pos-device"><div class="mode-contactless"></div></div>
+              </div>
+              <p class="mode-copy" data-mode-copy>设备互联，定向推送</p>
+            </div>
+            <button class="mode-primary-button" data-action="password-peripheral" data-mode-primary>开启外设模式</button>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="communication-settings" aria-label="通讯设置">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="top-nav">
+            <button class="back-button" data-action="open-settings" aria-label="返回设置"></button>
+            <div class="nav-title">通讯设置</div>
+            <div></div>
+          </div>
+          <div class="communication-body">
+            <div class="communication-card">
+              <label class="communication-label" for="communication-address">当前通讯地址</label>
+              <input class="communication-input" id="communication-address" data-communication-input type="url" autocomplete="off" spellcheck="false" readonly>
+            </div>
+            <div class="communication-actions">
+              <p class="communication-feedback" data-communication-feedback></p>
+              <button class="primary-button" data-action="edit-communication" data-communication-edit-button>修改</button>
+              <div class="communication-edit-actions" data-communication-edit-actions hidden>
+                <button class="secondary-button" data-action="cancel-communication">取消</button>
+                <button class="primary-button" data-action="save-communication">保存</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="password" aria-label="管理密码">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="top-nav">
+            <button class="back-button" data-action="password-back" aria-label="返回"></button>
+            <div class="nav-title">管理密码</div>
+            <div></div>
+          </div>
+          <div class="password-body">
+            <h2 class="password-title">请输入 6 位管理密码</h2>
+            <p class="password-subtitle" data-password-hint hidden></p>
+            <div class="pin-dots" data-pin-dots></div>
+            <div class="keypad" aria-label="数字键盘">
+              <button class="key" data-key="1">1</button>
+              <button class="key" data-key="2">2</button>
+              <button class="key" data-key="3">3</button>
+              <button class="key" data-key="4">4</button>
+              <button class="key" data-key="5">5</button>
+              <button class="key" data-key="6">6</button>
+              <button class="key" data-key="7">7</button>
+              <button class="key" data-key="8">8</button>
+              <button class="key" data-key="9">9</button>
+              <button class="key" data-action="clear-pin">清除</button>
+              <button class="key" data-key="0">0</button>
+              <button class="key" data-action="delete-pin">删除</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen peripheral-page" data-screen="peripheral-home" aria-label="外设首页">
+          <img class="poster" src="assets/metapos外设模式首页素材图.png" alt="Meta POS 外设模式首页宣传图">
+          <button class="hotspot hidden-entry-zone" data-action="hidden-tap" aria-label="隐藏运维入口"></button>
+          <div class="tap-progress" data-tap-progress>隐藏入口 0 / 20</div>
+        </section>
+
+        <section class="screen" data-screen="read-card" aria-label="Meta POS 读卡页">
+          <img class="full-screen-image" src="assets/metapos读卡引导页.png" alt="Meta POS 读卡引导页">
+          <button class="hotspot" style="left: 0; top: 48px; width: 120px; height: 96px;" data-action="cancel-read" aria-label="取消读卡"></button>
+          <div class="read-timer-override">120 s</div>
+          <div class="read-toast" data-read-toast>
+            <div class="read-dialog" role="alert" aria-live="assertive">
+              <div class="toast-icon">!</div>
+              <div class="toast-title" data-read-toast-copy>读卡失败，请重试</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="read-processing" aria-label="读卡处理中">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="read-processing">
+            <div class="result-nav"><div></div><div></div><div></div></div>
+            <div class="read-processing-content">
+              <div class="read-loading" aria-hidden="true"></div>
+              <div class="read-processing-title">处理中，请勿移开卡片</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="read-success" aria-label="读卡成功">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="read-result">
+            <div class="result-nav"><div></div><div></div><div class="result-countdown" data-read-success-countdown>3 s</div></div>
+            <div class="read-result-content">
+              <div class="circle-icon"></div>
+              <div class="result-title">操作成功</div>
+              <div class="result-detail">请取回您的银行卡</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="read-cancelled" aria-label="读卡已取消">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="read-result">
+            <div class="result-nav"><div></div><div></div><div></div></div>
+            <div class="read-result-content">
+              <div class="circle-icon timeout"></div>
+              <div class="result-title">操作已取消</div>
+              <div class="result-detail">请返回大屏幕上继续操作。</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" data-screen="read-timeout" aria-label="读卡超时">
+          <div class="statusbar"><span class="android-icons"><span class="wifi"></span><span class="battery"></span></span><span>12:30</span></div>
+          <div class="read-result">
+            <div class="result-nav"><div></div><div></div><div class="result-countdown" data-read-timeout-countdown>3 s</div></div>
+            <div class="read-result-content">
+              <div class="circle-icon timeout"></div>
+              <div class="result-title">操作超时</div>
+              <div class="result-detail">请在大屏上重新发起操作。</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen acq-screen" data-screen="acq-swipe" aria-label="通华刷卡引导">
+          <div class="acq-top">
+            <button class="back-button" data-action="acq-back" aria-label="返回"></button>
+            <div class="acq-title" data-acq-title>消费</div>
+            <div class="acq-timer"><span class="hourglass"></span><span data-acq-timer>119</span></div>
+          </div>
+          <div class="acq-body">
+            <div class="amount-card">
+              <div class="label">金额(HKD)</div>
+              <div class="value">0.35</div>
+            </div>
+            <div class="acq-instruction" data-acq-instruction>请刷卡或插入IC卡或挥卡或输入卡号</div>
+            <div class="card-input">卡号</div>
+            <div class="contactless" aria-hidden="true">
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="ring"></div>
+              <div class="card-shape"></div>
+              <div class="hand"></div>
+            </div>
+            <button class="acq-button" data-action="start-acq-processing">确定</button>
+          </div>
+        </section>
+
+        <section class="screen acq-screen" data-screen="acq-processing" aria-label="通华处理中">
+          <div class="acq-top">
+            <div></div>
+            <div class="acq-title" data-acq-title-processing>消费</div>
+            <div class="acq-timer"><span class="hourglass"></span><span>118</span></div>
+          </div>
+          <div class="acq-body">
+            <div class="amount-card">
+              <div class="label">金额(HKD)</div>
+              <div class="value">0.35</div>
+            </div>
+            <div class="processing-copy" data-processing-copy>处理中，请勿移卡</div>
+            <div class="processing-card">卡号</div>
+            <div class="contactless" aria-hidden="true">
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="wave"></div>
+              <div class="ring"></div>
+              <div class="card-shape"></div>
+              <div class="hand"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen acq-screen" data-screen="acq-receiving" aria-label="通华数据接收中">
+          <div class="acq-top">
+            <div></div>
+            <div class="acq-title" data-acq-title-receiving>消费</div>
+            <div></div>
+          </div>
+          <div class="receiving-body">
+            <div class="receiving-mark"></div>
+            <div class="receiving-time">65S</div>
+            <div class="receiving-text">数据接收中...</div>
+          </div>
+        </section>
+
+        <section class="screen acq-screen" data-screen="acq-result" aria-label="通华结果页">
+          <div class="acq-top">
+            <div></div>
+            <div class="acq-title" data-acq-title-result>消费</div>
+            <div class="acq-timer"><span class="hourglass"></span><span>30</span></div>
+          </div>
+          <div class="acq-result-body">
+            <div class="acq-check"></div>
+            <div class="acq-result-title" data-acq-result-title>消费成功</div>
+            <button class="acq-button" data-action="finish-acq">确定</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <aside class="aio-console" aria-label="AIO 指令控制台">
+      <div class="console-header">
+        <div>
+          <h1 class="console-title">AIO 指令控制台</h1>
+          <p class="console-subtitle">模拟 AIO 向 Meta POS 外设模式下发控制指令，并查看 Meta POS 的响应。</p>
+        </div>
+        <div class="console-badge">AIO</div>
+      </div>
+
+      <div class="console-section">
+        <div class="console-state-grid">
+          <div class="state-line"><span>当前页面</span><strong data-current-screen>标准模式首页</strong></div>
+          <div class="state-line"><span>设备模式</span><strong data-current-mode>标准模式</strong></div>
+          <div class="state-line"><span>任务状态</span><strong data-current-task>空闲</strong></div>
+          <div class="state-line"><span>设备号</span><strong>SUNMI-P3-001</strong></div>
+        </div>
+      </div>
+
+      <div class="console-section">
+        <h2 class="section-title">AIO 下发指令</h2>
+        <div class="command-grid">
+          <button class="command-button" data-command="QUERY_STATUS">QUERY_STATUS<small>查询 Meta POS 状态</small></button>
+          <button class="command-button" data-command="HEARTBEAT">HEARTBEAT<small>心跳 / 连通性检查</small></button>
+          <button class="command-button primary" data-command="START_READ_CARD">START_READ_CARD<small>发起银行卡读卡</small></button>
+          <button class="command-button" data-command="CANCEL_READ_CARD">CANCEL_READ_CARD<small>取消读卡任务</small></button>
+          <button class="command-button primary" data-command="START_CARD_PAYMENT">START_CARD_PAYMENT<small>发起银行卡支付</small></button>
+          <button class="command-button primary" data-command="START_CARD_PREAUTH">START_CARD_PREAUTH<small>发起银行卡预授权</small></button>
+        </div>
+        <div class="note">这里的按钮代表 AIO 下发给 Meta POS 的业务级指令，不暴露联迪 / 通华底层接口。</div>
+      </div>
+
+      <div class="console-section">
+        <h2 class="section-title">当前请求 Payload</h2>
+        <pre class="payload-box" data-payload-preview>{}</pre>
+      </div>
+
+      <div class="console-section">
+        <h2 class="section-title">Meta POS 响应</h2>
+        <pre class="response-box" data-response-preview>{}</pre>
+      </div>
+
+      <div class="console-section">
+        <h2 class="section-title">Meta POS / 回执模拟</h2>
+        <div class="tool-grid">
+          <button class="tool-button green" data-action="go-peripheral">进入外设首页<small>需先输入管理密码</small></button>
+          <button class="tool-button" data-action="open-settings">进入设置<small>实施 / 运维入口</small></button>
+          <button class="tool-button" data-action="read-processing">读卡中<small>卡片已接触</small></button>
+          <button class="tool-button green" data-action="read-success">读卡成功<small>Meta POS 返回读卡结果</small></button>
+          <button class="tool-button red" data-action="read-error">读卡失败<small>消费者可重试</small></button>
+          <button class="tool-button" data-action="read-timeout">读卡超时<small>AIO 需重新发起</small></button>
+          <button class="tool-button red" data-action="task-busy">模拟忙碌<small>并发任务被拒绝</small></button>
+          <button class="tool-button" data-action="reset-demo">重置 Demo<small>回到标准模式</small></button>
+          <button class="tool-button" data-action="clear-console-log">清空日志<small>仅清控制台</small></button>
+        </div>
+      </div>
+
+      <div class="console-section">
+        <h2 class="section-title">指令日志</h2>
+        <div class="log-stream" data-console-log></div>
+      </div>
+
+      <div class="console-section">
+        <h2 class="section-title">主链路进度</h2>
+        <div class="journey-list">
+          <div class="journey-step" data-step="mode">实施 / 运维人员切换外设模式</div>
+          <div class="journey-step" data-step="read">AIO 发起读卡，Meta POS 返回读卡结果</div>
+          <div class="journey-step" data-step="pay">AIO 发起银行卡支付，通华返回结果</div>
+          <div class="journey-step" data-step="preauth">AIO 发起银行卡预授权，通华返回结果</div>
+          <div class="journey-step" data-step="ops">隐藏入口进入设置并可切回标准模式</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const state = {
+      screen: "standard",
+      mode: "standard",
+      task: "idle",
+      passwordIntent: null,
+      passwordReturn: "settings",
+      pin: "",
+      hiddenTaps: 0,
+      readAttempts: 0,
+      currentAcqType: "payment",
+      communicationAddress: "https://cruise-gateway.sqb.com",
+      communicationEditing: false,
+      selectedCommand: "QUERY_STATUS",
+      requestSeq: 1,
+      currentPayload: null,
+      logs: [],
+      lastResponse: {
+        accepted: true,
+        code: "READY",
+        message: "等待 AIO 指令"
+      },
+      timers: [],
+      completed: {
+        mode: false,
+        read: false,
+        pay: false,
+        preauth: false,
+        ops: false
+      }
+    };
+
+    const screenNames = {
+      standard: "标准模式首页",
+      settings: "设置页",
+      "mode-detail": "外设模式详情",
+      "communication-settings": "通讯设置",
+      password: "管理密码",
+      "peripheral-home": "外设首页",
+      "read-card": "读卡页",
+      "read-processing": "读卡处理中",
+      "read-success": "读卡成功",
+      "read-cancelled": "读卡已取消",
+      "read-timeout": "读卡超时",
+      "acq-swipe": "通华刷卡引导",
+      "acq-processing": "通华处理中",
+      "acq-receiving": "通华数据接收中",
+      "acq-result": "通华结果页"
+    };
+
+    const taskNames = {
+      idle: "空闲",
+      reading: "读卡中",
+      paying: "银行卡支付中",
+      preauth: "银行卡预授权中",
+      busy: "设备忙碌",
+      success: "任务成功",
+      failed: "任务失败",
+      timeout: "任务超时",
+      cancelled: "任务取消"
+    };
+
+    const commandDefinitions = {
+      QUERY_STATUS: {
+        body: () => ({}),
+        run: () => ({
+          accepted: true,
+          code: "SUCCESS",
+          message: "状态查询成功",
+          data: currentStatus()
+        })
+      },
+      HEARTBEAT: {
+        body: () => ({ timeoutMs: 3000 }),
+        run: () => ({
+          accepted: true,
+          code: "PONG",
+          message: "Meta POS 在线",
+          data: currentStatus()
+        })
+      },
+      START_READ_CARD: {
+        body: () => ({
+          scene: "AIO_BIND_CARD",
+          timeoutSeconds: 120,
+          supportReadTypes: ["MAG", "ICC", "RF"],
+          returnFields: ["cardNo", "expiryDate"]
+        }),
+        run: () => guardedTask("START_READ_CARD", () => {
+          startRead();
+          return {
+            accepted: true,
+            code: "TASK_ACCEPTED",
+            message: "读卡任务已下发到 Meta POS",
+            data: { peripheralTaskId: latestTaskId("READ") }
+          };
+        })
+      },
+      CANCEL_READ_CARD: {
+        body: () => ({
+          peripheralTaskId: latestTaskId("READ"),
+          reason: "AIO_USER_CANCEL"
+        }),
+        run: () => {
+          if (state.task !== "reading") {
+            return reject("TASK_NOT_CANCELLABLE", "当前没有可取消的读卡任务");
+          }
+          cancelRead();
+          return {
+            accepted: true,
+            code: "TASK_CANCELLED",
+            message: "读卡任务已取消",
+            data: currentStatus()
+          };
+        }
+      },
+      START_CARD_PAYMENT: {
+        body: () => ({
+          scene: "AIO_CARD_PAYMENT",
+          orderNo: "AIO-PAY-202605270001",
+          amount: "0.35",
+          currency: "HKD",
+          subject: "AIO 自助银行卡支付"
+        }),
+        run: () => guardedTask("START_CARD_PAYMENT", () => {
+          startAcq("payment");
+          return {
+            accepted: true,
+            code: "TASK_ACCEPTED",
+            message: "银行卡支付任务已下发到 Meta POS",
+            data: { peripheralTaskId: latestTaskId("PAY") }
+          };
+        })
+      },
+      START_CARD_PREAUTH: {
+        body: () => ({
+          scene: "AIO_CARD_PREAUTH",
+          preAuthNo: "AIO-AUTH-202605270001",
+          amount: "0.35",
+          currency: "HKD",
+          subject: "AIO 自助银行卡预授权"
+        }),
+        run: () => guardedTask("START_CARD_PREAUTH", () => {
+          startAcq("preauth");
+          return {
+            accepted: true,
+            code: "TASK_ACCEPTED",
+            message: "银行卡预授权任务已下发到 Meta POS",
+            data: { peripheralTaskId: latestTaskId("AUTH") }
+          };
+        })
+      }
+    };
+
+    function fitDevice() {
+      const shellGap = window.innerWidth <= 980 ? 56 : 504;
+      const maxW = Math.max(360, window.innerWidth - shellGap);
+      const maxH = window.innerHeight - 56;
+      const scale = Math.max(0.34, Math.min(0.72, maxW / 720, maxH / 1600));
+      document.documentElement.style.setProperty("--scale", scale.toFixed(4));
+    }
+
+    function clearTimers() {
+      state.timers.forEach((timer) => clearTimeout(timer));
+      state.timers = [];
+    }
+
+    function delay(fn, ms) {
+      const timer = setTimeout(fn, ms);
+      state.timers.push(timer);
+    }
+
+    function show(screen) {
+      state.screen = screen;
+      document.querySelectorAll(".screen").forEach((el) => {
+        el.classList.toggle("active", el.dataset.screen === screen);
+      });
+      updateChrome();
+    }
+
+    function updateChrome() {
+      document.querySelector("[data-current-screen]").textContent = screenNames[state.screen] || state.screen;
+      document.querySelector("[data-current-mode]").textContent = state.mode === "peripheral" ? "外设模式" : "标准模式";
+      document.querySelector("[data-current-task]").textContent = taskNames[state.task] || state.task;
+
+      updateModeDetail();
+      updateCommunicationSettings();
+
+      document.querySelectorAll("[data-task-button]").forEach((button) => {
+        button.disabled = state.task !== "idle" && state.screen !== "peripheral-home";
+      });
+
+      document.querySelectorAll("[data-step]").forEach((step) => {
+        step.classList.toggle("done", Boolean(state.completed[step.dataset.step]));
+      });
+
+      const tapProgress = document.querySelector("[data-tap-progress]");
+      tapProgress.textContent = `隐藏入口 ${state.hiddenTaps} / 20`;
+      tapProgress.classList.toggle("visible", state.hiddenTaps > 0 && state.hiddenTaps < 20 && state.screen === "peripheral-home");
+      renderConsole();
+    }
+
+    function updateModeDetail() {
+      const title = document.querySelector("[data-mode-title]");
+      const copy = document.querySelector("[data-mode-copy]");
+      const button = document.querySelector("[data-mode-primary]");
+      const isPeripheral = state.mode === "peripheral";
+
+      title.textContent = "外设模式";
+      copy.textContent = "设备互联，定向推送";
+      button.textContent = isPeripheral ? "退出外设模式" : "开启外设模式";
+      button.dataset.action = isPeripheral ? "switch-standard" : "password-peripheral";
+    }
+
+    function updateCommunicationSettings() {
+      const input = document.querySelector("[data-communication-input]");
+      const editButton = document.querySelector("[data-communication-edit-button]");
+      const editActions = document.querySelector("[data-communication-edit-actions]");
+      if (input && document.activeElement !== input) {
+        input.value = state.communicationAddress;
+      }
+      if (input) {
+        input.readOnly = !state.communicationEditing;
+      }
+      if (editButton) {
+        editButton.hidden = state.communicationEditing;
+      }
+      if (editActions) {
+        editActions.hidden = !state.communicationEditing;
+      }
+    }
+
+    function setCommunicationFeedback(message, type = "success") {
+      const feedback = document.querySelector("[data-communication-feedback]");
+      if (!feedback) return;
+      feedback.textContent = message;
+      feedback.classList.toggle("error", type === "error");
+    }
+
+    function editCommunicationAddress() {
+      state.communicationEditing = true;
+      setCommunicationFeedback("");
+      updateChrome();
+      const input = document.querySelector("[data-communication-input]");
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    function cancelCommunicationEdit() {
+      state.communicationEditing = false;
+      setCommunicationFeedback("");
+      updateChrome();
+    }
+
+    function saveCommunicationAddress() {
+      const input = document.querySelector("[data-communication-input]");
+      const nextAddress = input.value.trim();
+      if (!nextAddress) {
+        setCommunicationFeedback("通讯地址不能为空", "error");
+        input.focus();
+        return;
+      }
+      state.communicationAddress = nextAddress;
+      state.communicationEditing = false;
+      setCommunicationFeedback("已保存");
+      pushLog("success", "LOCAL -> Meta POS", `通讯地址已更新：${nextAddress}`);
+      updateChrome();
+    }
+
+    function latestTaskId(prefix) {
+      return `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-0001`;
+    }
+
+    function currentStatus() {
+      return {
+        deviceNo: "SUNMI-P3-001",
+        mode: state.mode === "peripheral" ? "PERIPHERAL" : "STANDARD",
+        screen: state.screen,
+        taskStatus: state.task.toUpperCase(),
+        taskLabel: taskNames[state.task] || state.task
+      };
+    }
+
+    function buildPayload(command) {
+      const definition = commandDefinitions[command] || commandDefinitions.QUERY_STATUS;
+      return {
+        requestId: `AIO-${String(state.requestSeq).padStart(4, "0")}`,
+        command,
+        deviceNo: "SUNMI-P3-001",
+        sentAt: new Date().toISOString(),
+        body: definition.body()
+      };
+    }
+
+    function reject(code, message) {
+      return {
+        accepted: false,
+        code,
+        message,
+        data: currentStatus()
+      };
+    }
+
+    function guardedTask(command, accept) {
+      if (state.mode !== "peripheral") {
+        return reject("NOT_PERIPHERAL_MODE", "Meta POS 当前不是外设模式，AIO 指令被拒绝");
+      }
+      if (state.task !== "idle") {
+        return reject("DEVICE_BUSY", `Meta POS 当前${taskNames[state.task] || state.task}，不接收新任务`);
+      }
+      return accept(command);
+    }
+
+    function renderConsole() {
+      const payloadPreview = document.querySelector("[data-payload-preview]");
+      const responsePreview = document.querySelector("[data-response-preview]");
+      const logStream = document.querySelector("[data-console-log]");
+      if (!payloadPreview || !responsePreview || !logStream) return;
+
+      payloadPreview.textContent = JSON.stringify(state.currentPayload || buildPayload(state.selectedCommand), null, 2);
+      responsePreview.textContent = JSON.stringify(state.lastResponse, null, 2);
+
+      document.querySelectorAll("[data-command]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.command === state.selectedCommand);
+      });
+
+      logStream.innerHTML = state.logs.map((entry) => `
+        <div class="log-entry ${entry.kind}">
+          <div><span class="log-time">${entry.time}</span> ${entry.title}</div>
+          <div>${entry.message}</div>
+        </div>
+      `).join("");
+    }
+
+    function pushLog(kind, title, message) {
+      const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+      state.logs.unshift({ kind, title, message, time });
+      state.logs = state.logs.slice(0, 12);
+      renderConsole();
+    }
+
+    function sendAioCommand(command) {
+      const definition = commandDefinitions[command];
+      if (!definition) return;
+      state.selectedCommand = command;
+      const payload = buildPayload(command);
+      state.currentPayload = payload;
+      const response = definition.run(payload);
+      state.lastResponse = {
+        requestId: payload.requestId,
+        ...response
+      };
+      state.requestSeq += 1;
+      pushLog(response.accepted ? "success" : "reject", `AIO -> Meta POS: ${command}`, response.message);
+      updateChrome();
+    }
+
+    function renderPin() {
+      const dots = document.querySelector("[data-pin-dots]");
+      dots.innerHTML = "";
+      for (let i = 0; i < 6; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = `pin-dot${i < state.pin.length ? " filled" : ""}`;
+        dots.appendChild(dot);
+      }
+    }
+
+    function enterPassword(intent, returnScreen, hint) {
+      state.passwordIntent = intent;
+      state.passwordReturn = returnScreen || "settings";
+      state.pin = "";
+      document.querySelector("[data-password-hint]").textContent = hint || "请输入管理密码";
+      renderPin();
+      show("password");
+    }
+
+    function completePassword() {
+      const intent = state.passwordIntent;
+      state.pin = "";
+      renderPin();
+      if (intent === "switch-peripheral") {
+        state.mode = "peripheral";
+        state.task = "idle";
+        state.completed.mode = true;
+        show("peripheral-home");
+        state.lastResponse = {
+          accepted: true,
+          code: "LOCAL_MODE_READY",
+          message: "已开启外设模式，可接收 AIO 指令",
+          data: currentStatus()
+        };
+        pushLog("success", "LOCAL -> Meta POS", "管理密码验证通过，已开启外设模式");
+        return;
+      }
+      if (intent === "hidden-settings") {
+        state.completed.ops = true;
+        state.hiddenTaps = 0;
+        show("settings");
+        return;
+      }
+      if (intent === "switch-standard") {
+        state.mode = "standard";
+        state.task = "idle";
+        state.completed.ops = true;
+        show("standard");
+        return;
+      }
+      show(state.passwordReturn);
+    }
+
+    function startRead() {
+      clearTimers();
+      state.mode = "peripheral";
+      state.task = "reading";
+      state.readAttempts = 0;
+      state.hiddenTaps = 0;
+      hideReadFailureToast();
+      show("read-card");
+    }
+
+    function startReadProcessing() {
+      clearTimers();
+      if (state.task !== "reading" || !["read-card", "read-processing"].includes(state.screen)) {
+        state.lastResponse = reject("NO_ACTIVE_READ_TASK", "当前没有进行中的读卡任务，无法进入读卡中状态");
+        pushLog("reject", "Meta POS -> AIO", "无进行中读卡任务");
+        updateChrome();
+        return;
+      }
+      hideReadFailureToast();
+      show("read-processing");
+    }
+
+    function startResultCountdown(selector, onDone) {
+      const counter = document.querySelector(selector);
+      if (counter) {
+        counter.textContent = "3 s";
+        [2, 1].forEach((n, index) => {
+          delay(() => {
+            counter.textContent = `${n} s`;
+          }, (index + 1) * 1000);
+        });
+      }
+      delay(onDone, 3000);
+    }
+
+    function finishReadSuccess() {
+      clearTimers();
+      state.task = "success";
+      state.completed.read = true;
+      show("read-success");
+      startResultCountdown("[data-read-success-countdown]", () => {
+        state.task = "idle";
+        show("peripheral-home");
+      });
+    }
+
+    function finishReadTimeout() {
+      clearTimers();
+      state.task = "timeout";
+      hideReadFailureToast();
+      show("read-timeout");
+      startResultCountdown("[data-read-timeout-countdown]", () => {
+        if (state.task === "timeout") {
+          state.task = "idle";
+          show("peripheral-home");
+        }
+      });
+    }
+
+    function cancelRead() {
+      clearTimers();
+      state.task = "cancelled";
+      hideReadFailureToast();
+      show("read-cancelled");
+      delay(() => {
+        if (state.task === "cancelled") {
+          state.task = "idle";
+          show("peripheral-home");
+        }
+      }, 2300);
+    }
+
+    function hideReadFailureToast() {
+      const toast = document.querySelector("[data-read-toast]");
+      if (toast) toast.classList.remove("visible");
+    }
+
+    function showReadFailureToast() {
+      clearTimers();
+      if (state.task !== "reading" || !["read-card", "read-processing"].includes(state.screen)) {
+        state.lastResponse = reject("NO_ACTIVE_READ_TASK", "当前没有进行中的读卡任务，无法模拟中间失败");
+        pushLog("reject", "Meta POS -> AIO", "无进行中读卡任务");
+        updateChrome();
+        return;
+      }
+      state.readAttempts += 1;
+      show("read-card");
+      const copy = document.querySelector("[data-read-toast-copy]");
+      copy.textContent = "读卡失败，请重试";
+      document.querySelector("[data-read-toast]").classList.add("visible");
+      state.lastResponse = {
+        accepted: true,
+        code: "READ_CARD_RETRYABLE_FAILED",
+        message: "本次读卡失败，读卡任务仍在进行中",
+        data: {
+          peripheralTaskId: latestTaskId("READ"),
+          attempt: state.readAttempts,
+          taskStatus: "READING"
+        }
+      };
+      pushLog("reject", "Meta POS -> AIO", `第 ${state.readAttempts} 次读卡失败，消费者可继续尝试`);
+      delay(hideReadFailureToast, 2600);
+      updateChrome();
+    }
+
+    function setAcqCopy(type) {
+      const isPreauth = type === "preauth";
+      const title = isPreauth ? "预授权" : "消费";
+      document.querySelector("[data-acq-title]").textContent = title;
+      document.querySelector("[data-acq-title-processing]").textContent = title;
+      document.querySelector("[data-acq-title-receiving]").textContent = title;
+      document.querySelector("[data-acq-title-result]").textContent = title;
+      document.querySelector("[data-acq-result-title]").textContent = isPreauth ? "预授权成功" : "消费成功";
+      document.querySelector("[data-acq-instruction]").textContent = isPreauth
+        ? "请刷卡或插入IC卡或挥卡完成预授权"
+        : "请刷卡或插入IC卡或挥卡或输入卡号";
+      document.querySelector("[data-processing-copy]").textContent = isPreauth ? "预授权处理中，请勿移卡" : "处理中，请勿移卡";
+    }
+
+    function startAcq(type) {
+      clearTimers();
+      state.mode = "peripheral";
+      state.currentAcqType = type;
+      state.task = type === "preauth" ? "preauth" : "paying";
+      state.hiddenTaps = 0;
+      setAcqCopy(type);
+      show("acq-swipe");
+    }
+
+    function startAcqProcessing() {
+      show("acq-processing");
+      delay(() => show("acq-receiving"), 1050);
+      delay(() => show("acq-result"), 2150);
+    }
+
+    function finishAcq() {
+      if (state.currentAcqType === "preauth") {
+        state.completed.preauth = true;
+      } else {
+        state.completed.pay = true;
+      }
+      state.task = "idle";
+      show("peripheral-home");
+    }
+
+    function goPeripheral() {
+      clearTimers();
+      state.mode = "peripheral";
+      state.task = "idle";
+      state.hiddenTaps = 0;
+      show("peripheral-home");
+    }
+
+    function resetDemo() {
+      clearTimers();
+      state.screen = "standard";
+      state.mode = "standard";
+      state.task = "idle";
+      state.passwordIntent = null;
+      state.pin = "";
+      state.hiddenTaps = 0;
+      state.readAttempts = 0;
+      state.currentAcqType = "payment";
+      state.communicationAddress = "https://cruise-gateway.sqb.com";
+      state.communicationEditing = false;
+      state.currentPayload = null;
+      state.completed = {
+        mode: false,
+        read: false,
+        pay: false,
+        preauth: false,
+        ops: false
+      };
+      show("standard");
+    }
+
+    function handleAction(action) {
+      if (!action) return;
+      switch (action) {
+        case "open-settings":
+          clearTimers();
+          state.task = "idle";
+          if (state.mode === "peripheral" && state.screen !== "mode-detail") {
+            enterPassword("hidden-settings", "peripheral-home", "进入设置需要管理密码");
+          } else {
+            show("settings");
+          }
+          break;
+        case "settings-back":
+          show(state.mode === "peripheral" ? "peripheral-home" : "standard");
+          break;
+        case "mode-detail":
+          show("mode-detail");
+          break;
+        case "communication-settings":
+          state.communicationEditing = false;
+          setCommunicationFeedback("");
+          show("communication-settings");
+          break;
+        case "edit-communication":
+          editCommunicationAddress();
+          break;
+        case "cancel-communication":
+          cancelCommunicationEdit();
+          break;
+        case "save-communication":
+          saveCommunicationAddress();
+          break;
+        case "password-peripheral":
+          enterPassword("switch-peripheral", "mode-detail", "开启外设模式需要管理密码");
+          break;
+        case "password-back":
+          show(state.passwordReturn || "settings");
+          break;
+        case "clear-pin":
+          state.pin = "";
+          renderPin();
+          break;
+        case "delete-pin":
+          state.pin = state.pin.slice(0, -1);
+          renderPin();
+          break;
+        case "switch-standard":
+          clearTimers();
+          state.mode = "standard";
+          state.task = "idle";
+          state.completed.ops = true;
+          show("standard");
+          break;
+        case "hidden-tap":
+          state.hiddenTaps += 1;
+          if (state.hiddenTaps >= 20) {
+            enterPassword("hidden-settings", "peripheral-home", "进入设置需要管理密码");
+          } else {
+            updateChrome();
+          }
+          break;
+        case "go-standard":
+          clearTimers();
+          state.mode = "standard";
+          state.task = "idle";
+          show("standard");
+          break;
+        case "go-peripheral":
+          if (state.mode === "peripheral") {
+            goPeripheral();
+            state.lastResponse = {
+              accepted: true,
+              code: "LOCAL_MODE_READY",
+              message: "当前已在外设模式，可接收 AIO 指令",
+              data: currentStatus()
+            };
+            pushLog("success", "LOCAL -> Meta POS", "已回到外设首页");
+          } else {
+            enterPassword("switch-peripheral", "standard", "开启外设模式需要管理密码");
+            state.lastResponse = {
+              accepted: false,
+              code: "MANAGER_PASSWORD_REQUIRED",
+              message: "开启外设模式需要先输入管理密码",
+              data: currentStatus()
+            };
+            pushLog("reject", "LOCAL -> Meta POS", "开启外设模式需要管理密码");
+          }
+          break;
+        case "reset-demo":
+          resetDemo();
+          state.logs = [];
+          state.lastResponse = {
+            accepted: true,
+            code: "READY",
+            message: "Demo 已重置，等待 AIO 指令"
+          };
+          renderConsole();
+          break;
+        case "aio-read":
+          sendAioCommand("START_READ_CARD");
+          break;
+        case "aio-payment":
+          sendAioCommand("START_CARD_PAYMENT");
+          break;
+        case "aio-preauth":
+          sendAioCommand("START_CARD_PREAUTH");
+          break;
+        case "task-busy":
+          state.task = "busy";
+          state.lastResponse = reject("DEVICE_BUSY", "Meta POS 已被置为忙碌，用于模拟并发任务拒绝");
+          pushLog("reject", "SIMULATOR -> Meta POS", "设备忙碌，AIO 新任务会被拒绝");
+          updateChrome();
+          delay(() => {
+            if (state.task === "busy") {
+              state.task = "idle";
+              updateChrome();
+            }
+          }, 1500);
+          break;
+        case "read-success":
+          finishReadSuccess();
+          state.lastResponse = {
+            accepted: true,
+            code: "READ_CARD_SUCCESS",
+            message: "Meta POS 已返回读卡结果给 AIO",
+            data: {
+              peripheralTaskId: latestTaskId("READ"),
+              cardNo: "**** **** **** 8808",
+              expiryDate: "12/29"
+            }
+          };
+          pushLog("success", "Meta POS -> AIO", "读卡成功，返回卡号和有效期");
+          break;
+        case "read-processing":
+          startReadProcessing();
+          break;
+        case "read-error":
+          showReadFailureToast();
+          break;
+        case "read-timeout":
+          finishReadTimeout();
+          state.lastResponse = reject("READ_CARD_TIMEOUT", "读卡任务超时，AIO 需要重新发起");
+          pushLog("reject", "Meta POS -> AIO", "读卡超时");
+          break;
+        case "retry-read":
+          startRead();
+          break;
+        case "cancel-read":
+          sendAioCommand("CANCEL_READ_CARD");
+          break;
+        case "acq-back":
+          goPeripheral();
+          break;
+        case "start-acq-processing":
+          startAcqProcessing();
+          break;
+        case "finish-acq":
+          finishAcq();
+          state.lastResponse = {
+            accepted: true,
+            code: state.currentAcqType === "preauth" ? "PREAUTH_SUCCESS" : "PAYMENT_SUCCESS",
+            message: state.currentAcqType === "preauth" ? "预授权结果已返回 AIO" : "支付结果已返回 AIO",
+            data: {
+              peripheralTaskId: latestTaskId(state.currentAcqType === "preauth" ? "AUTH" : "PAY"),
+              amount: "0.35",
+              currency: "HKD"
+            }
+          };
+          pushLog("success", "Meta POS -> AIO", state.currentAcqType === "preauth" ? "预授权成功" : "支付成功");
+          updateChrome();
+          break;
+        case "clear-console-log":
+          state.logs = [];
+          renderConsole();
+          break;
+        default:
+          break;
+      }
+    }
+
+    document.addEventListener("click", (event) => {
+      const actionEl = event.target.closest("[data-action]");
+      if (!actionEl) return;
+      handleAction(actionEl.dataset.action);
+    });
+
+    document.addEventListener("click", (event) => {
+      const commandEl = event.target.closest("[data-command]");
+      if (!commandEl) return;
+      sendAioCommand(commandEl.dataset.command);
+    });
+
+    document.addEventListener("click", (event) => {
+      const keyEl = event.target.closest("[data-key]");
+      if (!keyEl || state.screen !== "password") return;
+      if (state.pin.length >= 6) return;
+      state.pin += keyEl.dataset.key;
+      renderPin();
+      if (state.pin.length === 6) {
+        delay(completePassword, 180);
+      }
+    });
+
+    window.addEventListener("resize", fitDevice);
+    fitDevice();
+    renderPin();
+    updateChrome();
+  </script>
+</body>
+</html>
