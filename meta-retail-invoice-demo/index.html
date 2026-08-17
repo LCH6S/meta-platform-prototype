@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meta 零售开票订单管理 Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img
+          class="brand-logo"
+          src="./assets/logo-shouqianba-yellow.png"
+          alt="收钱吧"
+          width="80"
+          height="24"
+        />
+      </div>
+      <nav class="top-tabs" aria-label="主导航">
+        <button type="button">首页</button>
+        <button type="button" class="active" aria-current="page">电子发票</button>
+        <button type="button">商场联营管理</button>
+        <button type="button">管理功能</button>
+      </nav>
+      <div class="top-actions" aria-label="账户">
+        <button type="button" class="icon-btn" title="导出" aria-label="导出">⇧</button>
+        <span class="divider"></span>
+        <button type="button" class="account-btn">管理员</button>
+        <button type="button" class="icon-btn" title="语言" aria-label="切换语言">文</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" aria-label="电子发票菜单">
+        <div class="menu-group">
+          <div class="menu-label">发票业务</div>
+          <details class="menu-section">
+            <summary class="menu-parent">
+              <span>发票管理</span><span class="menu-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="menu-children">
+              <button type="button" class="menu-child">发票数据统计</button>
+              <button type="button" class="menu-child">发票查询</button>
+            </div>
+          </details>
+          <button type="button" class="menu-direct">纳税人管理</button>
+        </div>
+
+        <div class="menu-group">
+          <div class="menu-label">场景功能</div>
+          <details class="menu-section">
+            <summary class="menu-parent">
+              <span>手动开票</span><span class="menu-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="menu-children">
+              <button type="button" class="menu-child">批量开票</button>
+            </div>
+          </details>
+          <details class="menu-section">
+            <summary class="menu-parent">
+              <span>自营店结算开票</span><span class="menu-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="menu-children">
+              <button type="button" class="menu-child">月度汇总</button>
+              <button type="button" class="menu-child">结算单</button>
+              <button type="button" class="menu-child">开票申请</button>
+              <button type="button" class="menu-child">自营门店设置</button>
+            </div>
+          </details>
+          <details class="menu-section">
+            <summary class="menu-parent">
+              <span>联营店结算开票</span><span class="menu-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="menu-children">
+              <button type="button" class="menu-child">月度汇总</button>
+              <button type="button" class="menu-child">结算单</button>
+              <button type="button" class="menu-child">开票申请</button>
+            </div>
+          </details>
+          <details class="menu-section" open>
+            <summary class="menu-parent">
+              <span>零售订单开票</span><span class="menu-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="menu-children">
+              <button type="button" class="menu-child nav-item active" data-view="orders" aria-current="page">零售订单管理</button>
+              <button type="button" class="menu-child nav-item" data-view="applicationList">开票申请管理</button>
+            </div>
+          </details>
+          <button type="button" class="menu-direct">企业订单开票</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section id="workspace" class="workspace" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <aside class="drawer" id="drawer" aria-hidden="true" aria-label="详情抽屉">
+      <div class="drawer-panel">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow" id="drawerEyebrow">主订单生命周期</p>
+            <h2 id="drawerTitle">订单详情</h2>
+          </div>
+          <button class="icon-btn" id="drawerClose" title="关闭">×</button>
+        </div>
+        <div id="drawerBody" class="drawer-body"></div>
+      </div>
+    </aside>
+
+    <aside class="brand-modal" id="brandModal" aria-hidden="true" aria-label="切换品牌">
+      <div class="brand-modal-panel">
+        <div class="brand-modal-head">
+          <h2>切换品牌</h2>
+          <button class="icon-btn" id="brandModalClose" title="关闭">×</button>
+        </div>
+        <div id="brandModalBody" class="brand-modal-body"></div>
+        <div class="brand-modal-foot">
+          <button class="btn secondary" id="brandModalCancel">取消</button>
+          <button class="btn" id="brandModalConfirm">确定</button>
+        </div>
+      </div>
+    </aside>
+
+    <aside class="action-modal" id="orderActionModal" aria-hidden="true">
+      <div
+        class="action-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="orderActionModalTitle"
+      >
+        <div class="action-modal-head">
+          <h2 id="orderActionModalTitle">订单操作</h2>
+          <button class="icon-btn" id="orderActionModalClose" type="button" title="关闭" aria-label="关闭">×</button>
+        </div>
+        <form id="orderActionForm" novalidate>
+          <div id="orderActionModalBody" class="action-modal-body"></div>
+          <div class="action-modal-foot">
+            <button class="btn secondary" id="orderActionModalCancel" type="button">取消</button>
+            <button class="btn" id="orderActionModalConfirm" type="submit">确定</button>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <script src="./app.js"></script>
+    <script>
+      document.querySelectorAll(".nav-item").forEach((item) => {
+        item.addEventListener("click", () => {
+          document.querySelectorAll(".nav-item").forEach((target) => {
+            if (target.classList.contains("active")) {
+              target.setAttribute("aria-current", "page");
+            } else {
+              target.removeAttribute("aria-current");
+            }
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
