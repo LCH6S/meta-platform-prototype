@@ -110,6 +110,8 @@ function defaultApplicationQuery(anchorDate = ORDER_QUERY_DEMO_DATE) {
   return {
     applicationNo: "",
     merchantOrderNo: "",
+    store: "",
+    storeId: "",
     buyerName: "",
     buyerTaxNo: "",
     source: "全部",
@@ -160,17 +162,19 @@ const state = {
   ],
   visibleApplicationColumns: [
     "applicationTime",
-    "applicationNo",
     "source",
     "invoiceType",
     "merchantOrderNo",
     "storeName",
     "storeNo",
+    "sellerName",
+    "sellerTaxNo",
     "buyerName",
     "buyerTaxNo",
     "amount",
     "status",
     "statusDescription",
+    "applicationNo",
     "actions",
   ],
 };
@@ -196,17 +200,19 @@ const orderListColumns = [
 
 const applicationListColumns = [
   { key: "applicationTime", label: "申请时间", width: 156 },
-  { key: "applicationNo", label: "申请号", width: 210, required: true },
   { key: "source", label: "申请来源", width: 126 },
   { key: "invoiceType", label: "发票类型", width: 96 },
   { key: "merchantOrderNo", label: "商家订单号", width: 190 },
   { key: "storeName", label: "销售门店名称", width: 160 },
   { key: "storeNo", label: "门店号", width: 126 },
+  { key: "sellerName", label: "销售方名称", width: 210 },
+  { key: "sellerTaxNo", label: "销售方税号", width: 190 },
   { key: "buyerName", label: "购方名称", width: 210 },
   { key: "buyerTaxNo", label: "购方税号", width: 190 },
   { key: "amount", label: "开票金额", width: 150, align: "right" },
   { key: "status", label: "申请状态", width: 116 },
   { key: "statusDescription", label: "状态说明", width: 240 },
+  { key: "applicationNo", label: "申请号", width: 210, required: true },
   { key: "actions", label: "操作", width: 240, align: "right", required: true, sticky: true },
 ];
 
@@ -3571,7 +3577,7 @@ function closeStoreSuggest(root) {
   input.removeAttribute("aria-activedescendant");
 }
 
-function bindStoreSuggest() {
+function bindStoreSuggest(onSubmit = submitOrderQuery) {
   const root = workspace.querySelector("[data-store-suggest]");
   const input = root?.querySelector("[data-store-suggest-input]");
   const list = root?.querySelector("[data-store-suggest-list]");
@@ -3639,7 +3645,7 @@ function bindStoreSuggest() {
       event.preventDefault();
       event.stopImmediatePropagation();
       if (!list.hidden && activeIndex >= 0) selectOption(options[activeIndex]);
-      else submitOrderQuery();
+      else onSubmit();
     }
   });
   root.addEventListener("focusout", () => {
@@ -4004,6 +4010,10 @@ function filteredCurrentBrandApplicationEntries(entries = currentBrandApplicatio
     const applicationNoMatched = !query.applicationNo || exactMatch(application.applyNo, query.applicationNo);
     const merchantOrderNoMatched = !query.merchantOrderNo
       || merchantOrderNos.some((orderNo) => exactMatch(orderNo, query.merchantOrderNo));
+    const storeKeyword = String(query.store || "").trim().toLowerCase();
+    const storeMatched = query.storeId
+      ? entry.order?.storeId === query.storeId
+      : !storeKeyword || `${entry.order?.storeName || ""} ${entry.order?.storeSn || ""} ${entry.order?.storeId || ""}`.toLowerCase().includes(storeKeyword);
     const buyerNameMatched = !query.buyerName
       || String(application.buyerName || "").toLowerCase().includes(query.buyerName.toLowerCase());
     const buyerTaxNoMatched = !query.buyerTaxNo || exactMatch(application.buyerTaxNo, query.buyerTaxNo);
@@ -4012,6 +4022,7 @@ function filteredCurrentBrandApplicationEntries(entries = currentBrandApplicatio
     const timeMatched = dateTimeInDateRange(application.appliedAt, query.applicationTimeRange);
     return applicationNoMatched
       && merchantOrderNoMatched
+      && storeMatched
       && buyerNameMatched
       && buyerTaxNoMatched
       && sourceMatched
@@ -4069,6 +4080,13 @@ function applicationListStoreText(entry, key, fallbackKey) {
   return entry.order?.[key] || entry.order?.[fallbackKey] || "-";
 }
 
+function applicationListSellerText(entry, invoiceIndex, orderKey) {
+  const values = [...new Set((entry.application.invoices || [])
+    .map((invoice) => String(invoice?.[invoiceIndex] || "").trim())
+    .filter((value) => value && value !== "-"))];
+  return values.length ? values.join("、") : entry.order?.[orderKey] || "-";
+}
+
 function applicationListRow(entry) {
   const { application } = entry;
   const cells = {
@@ -4079,6 +4097,8 @@ function applicationListRow(entry) {
     merchantOrderNo: applicationListMerchantOrderMarkup(entry),
     storeName: escapeHtml(applicationListStoreText(entry, "storeName", "salesStore")),
     storeNo: escapeHtml(applicationListStoreText(entry, "storeSn", "storeNo")),
+    sellerName: escapeHtml(applicationListSellerText(entry, 6, "subject")),
+    sellerTaxNo: escapeHtml(applicationListSellerText(entry, 7, "subjectTax")),
     buyerName: escapeHtml(application.buyerName || "-"),
     buyerTaxNo: escapeHtml(application.buyerTaxNo || "-"),
     amount: applicationListAmountMarkup(entry),
@@ -4149,6 +4169,7 @@ function renderApplicationList() {
       <div class="toolbar order-toolbar query-region" data-application-query>
         <div class="query-item query-item-normal">${field("申请号", `<input id="applicationNoSearch" data-application-query-input="applicationNo" value="${escapeAttribute(state.applicationQuery.applicationNo)}" placeholder="请输入完整申请号" />`)}</div>
         <div class="query-item query-item-normal">${field("商家订单号", `<input id="applicationOrderNoSearch" data-application-query-input="merchantOrderNo" value="${escapeAttribute(state.applicationQuery.merchantOrderNo)}" placeholder="请输入完整商家订单号" />`)}</div>
+        <div class="query-item query-item-normal">${field("门店", storeSuggestMarkup(state.applicationQuery))}</div>
         <div class="query-item query-item-normal">${field("购方名称", `<input id="applicationBuyerNameSearch" data-application-query-input="buyerName" value="${escapeAttribute(state.applicationQuery.buyerName)}" placeholder="请输入购方名称" />`)}</div>
         <div class="query-item query-item-normal">${field("购方税号", `<input id="applicationBuyerTaxNoSearch" data-application-query-input="buyerTaxNo" value="${escapeAttribute(state.applicationQuery.buyerTaxNo)}" placeholder="请输入完整购方税号" />`)}</div>
         <div class="query-item query-item-normal">${field("申请来源", queryDropdown("applicationSource", state.applicationQuery.source, applicationListSourceOptions(allEntries)))}</div>
@@ -4206,9 +4227,12 @@ function submitApplicationQuery() {
     return;
   }
   const value = (key) => workspace.querySelector(`[data-application-query-input="${key}"]`)?.value.trim() || "";
+  const storeInput = workspace.querySelector("[data-store-suggest-input]");
   state.applicationQuery = {
     applicationNo: value("applicationNo"),
     merchantOrderNo: value("merchantOrderNo"),
+    store: storeInput?.value.trim() || "",
+    storeId: storeInput?.dataset.selectedStoreId || "",
     buyerName: value("buyerName"),
     buyerTaxNo: value("buyerTaxNo"),
     source: workspace.querySelector('[data-query-dropdown="applicationSource"] [data-dropdown-trigger]')?.dataset.value || "全部",
@@ -4230,6 +4254,7 @@ function clearApplicationQuery() {
 function bindApplicationQueryActions() {
   bindQueryDropdowns();
   bindQueryDateTimeRanges();
+  bindStoreSuggest(submitApplicationQuery);
   workspace.querySelector("[data-application-search]")?.addEventListener("click", submitApplicationQuery);
   workspace.querySelector("[data-application-clear]")?.addEventListener("click", clearApplicationQuery);
   workspace.querySelectorAll("[data-application-query-input]").forEach((input) => {
@@ -4301,20 +4326,22 @@ function bindApplicationListActions(entries) {
 
 function exportApplications(entries) {
   const rows = [
-    ["申请时间", "申请号", "申请来源", "发票类型", "商家订单号", "销售门店名称", "门店号", "购方名称", "购方税号", "开票金额", "申请状态", "状态说明"],
+    ["申请时间", "申请来源", "发票类型", "商家订单号", "销售门店名称", "门店号", "销售方名称", "销售方税号", "购方名称", "购方税号", "开票金额", "申请状态", "状态说明", "申请号"],
     ...entries.map((entry) => [
       entry.application.appliedAt,
-      entry.application.applyNo,
       entry.application.source,
       entry.application.invoiceType,
       applicationListMerchantOrderText(entry),
       applicationListStoreText(entry, "storeName", "salesStore"),
       applicationListStoreText(entry, "storeSn", "storeNo"),
+      applicationListSellerText(entry, 6, "subject"),
+      applicationListSellerText(entry, 7, "subjectTax"),
       entry.application.buyerName,
       entry.application.buyerTaxNo,
       entry.application.amount,
       entry.application.status,
       entry.application.statusDescription,
+      entry.application.applyNo,
     ]),
   ];
   downloadTextFile(`开票申请-${currentBrand()?.number || "brand"}.csv`, `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\n")}`, "text/csv;charset=utf-8");
