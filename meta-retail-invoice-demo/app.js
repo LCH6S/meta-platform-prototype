@@ -2837,6 +2837,7 @@ function itemNameLabel(value) {
 }
 
 const applicationStatuses = [
+  "待订单同步",
   "开票中",
   "开票成功",
   "红冲中",
@@ -2853,6 +2854,33 @@ const applicationSources = [
   "订单手动开票",
 ];
 const RED_CONFIRMATION_PENDING_STATUS = "红字确认单待确认";
+const standaloneInvoiceApplications = [
+  {
+    id: "PREORDER-APPLY-202606120001",
+    brandCode: "BR-BURBERRY",
+    applyNo: "APPLY-PRE-202606120001",
+    source: "顾客自助开票-微信",
+    appliedAt: "2026-06-12 16:08",
+    invoiceType: "普票",
+    expectedMerchantOrderNo: "RO-PRE-202606120001",
+    expectedStoreName: "上海恒隆广场店",
+    expectedStoreNo: "SH-HL-001",
+    expectedStoreId: "ST100001",
+    sellerName: "博柏利（上海）贸易有限公司",
+    sellerTaxNo: "9131000066935277XR",
+    buyerType: "enterprise",
+    buyerName: "上海预申请测试商业有限公司",
+    buyerTaxNo: "91310106PRE000001",
+    deliveryEmail: "invoice.pending@example.com",
+    amount: "-",
+    status: "待订单同步",
+    statusDescription: "商家订单尚未同步，订单同步并匹配成功后系统将自动继续开票。",
+    relatedOrderIds: [],
+    relatedOrders: [],
+    invoices: [],
+    items: [],
+  },
+];
 const mergedApplicationSamples = {
   // 低频合并开票样例：仅影响申请层展示，订单仍保持自己的金额与归属。
   RO202606100001: { relatedOrderCount: 2 },
@@ -3025,6 +3053,32 @@ function normalizeApplicationRecord(application, order, index) {
   };
 }
 
+function normalizeStandaloneApplicationRecord(application) {
+  const status = normalizeApplicationStatus(application.status);
+  return {
+    ...application,
+    id: application.id || application.applyNo,
+    applyNo: application.applyNo || application.id || "-",
+    source: normalizeApplicationSource(application.source),
+    invoiceType: normalizeApplicationInvoiceType(application.invoiceType),
+    appliedAt: application.appliedAt || "-",
+    buyerType: ["personal", "个人"].includes(application.buyerType) ? "personal" : "enterprise",
+    buyerName: application.buyerName || "-",
+    buyerTaxNo: application.buyerTaxNo || "-",
+    deliveryEmail: application.deliveryEmail || "",
+    amount: application.amount || "-",
+    status,
+    statusDescription: application.statusDescription || "",
+    completedAt: application.completedAt || "-",
+    invoices: Array.isArray(application.invoices) ? application.invoices.map(cloneInvoiceRecord) : [],
+    items: Array.isArray(application.items) ? normalizeInvoiceItems(application.items) : [],
+    relatedOrderIds: Array.isArray(application.relatedOrderIds) ? [...application.relatedOrderIds] : [],
+    relatedOrders: Array.isArray(application.relatedOrders) ? [...application.relatedOrders] : [],
+    relatedOrderCount: 0,
+    currentOrderAmount: "-",
+  };
+}
+
 function normalizeInvoiceItems(items = []) {
   return items.map((item) => {
     const normalized = [...item];
@@ -3149,6 +3203,11 @@ function findCurrentBrandApplicationContext(applicationId, preferredOrderSn = ""
     const application = findExactOrderApplication(order, applicationId);
     if (application) return { order, application };
   }
+  const standaloneApplication = standaloneInvoiceApplications
+    .filter((application) => application.brandCode === state.currentBrandCode)
+    .map(normalizeStandaloneApplicationRecord)
+    .find((application) => application.id === applicationId || application.applyNo === applicationId);
+  if (standaloneApplication) return { order: null, application: standaloneApplication };
   return null;
 }
 
@@ -3158,6 +3217,9 @@ function applicationExistsOutsideCurrentBrand(applicationId) {
   return orders.some((order) => (
     !currentBrandOrderIds.has(order.orderSn)
     && Boolean(findExactOrderApplication(order, applicationId))
+  )) || standaloneInvoiceApplications.some((application) => (
+    application.brandCode !== state.currentBrandCode
+    && (application.id === applicationId || application.applyNo === applicationId)
   ));
 }
 
@@ -3995,11 +4057,26 @@ function currentBrandApplicationEntries() {
     });
   });
 
+  standaloneInvoiceApplications
+    .filter((application) => application.brandCode === state.currentBrandCode)
+    .map(normalizeStandaloneApplicationRecord)
+    .forEach((application) => {
+      const merchantOrderNos = new Set();
+      if (application.expectedMerchantOrderNo) merchantOrderNos.add(application.expectedMerchantOrderNo);
+      entryByApplicationId.set(application.id, {
+        application,
+        order: null,
+        merchantOrderNos,
+      });
+    });
+
   const availableOrderNos = new Set(currentBrandVisibleOrders().map((order) => order.orderSn));
   return [...entryByApplicationId.values()]
     .map((entry) => ({
       ...entry,
-      merchantOrderNos: [...entry.merchantOrderNos].filter((orderNo) => orderNo && availableOrderNos.has(orderNo)),
+      merchantOrderNos: [...entry.merchantOrderNos].filter((orderNo) => (
+        orderNo && (!entry.order || availableOrderNos.has(orderNo))
+      )),
     }))
     .sort((a, b) => String(b.application.appliedAt || "").localeCompare(String(a.application.appliedAt || "")));
 }
@@ -4013,13 +4090,16 @@ function filteredCurrentBrandApplicationEntries(entries = currentBrandApplicatio
     const merchantOrderNoMatched = !query.merchantOrderNo
       || merchantOrderNos.some((orderNo) => exactMatch(orderNo, query.merchantOrderNo));
     const storeKeyword = String(query.store || "").trim().toLowerCase();
+    const entryStoreId = entry.order?.storeId || application.expectedStoreId || "";
+    const entryStoreName = applicationListStoreText(entry, "storeName", "salesStore");
+    const entryStoreNo = applicationListStoreText(entry, "storeSn", "storeNo");
     const storeMatched = query.storeId
-      ? entry.order?.storeId === query.storeId
-      : !storeKeyword || `${entry.order?.storeName || ""} ${entry.order?.storeSn || ""} ${entry.order?.storeId || ""}`.toLowerCase().includes(storeKeyword);
+      ? entryStoreId === query.storeId
+      : !storeKeyword || `${entryStoreName} ${entryStoreNo} ${entryStoreId}`.toLowerCase().includes(storeKeyword);
     const sellerNameMatched = !query.sellerName
       || applicationListSellerText(entry, 6, "subject").toLowerCase().includes(query.sellerName.toLowerCase());
     const sellerTaxNoMatched = !query.sellerTaxNo
-      || applicationListSellerText(entry, 7, "subjectTax").split("、").some((taxNo) => exactMatch(taxNo, query.sellerTaxNo));
+      || exactMatch(applicationListSellerText(entry, 7, "subjectTax"), query.sellerTaxNo);
     const buyerNameMatched = !query.buyerName
       || String(application.buyerName || "").toLowerCase().includes(query.buyerName.toLowerCase());
     const buyerTaxNoMatched = !query.buyerTaxNo || exactMatch(application.buyerTaxNo, query.buyerTaxNo);
@@ -4081,18 +4161,24 @@ function applicationListMerchantOrderMarkup(entry) {
 }
 
 function applicationListMerchantOrderText(entry) {
-  return entry.order?.orderSn || entry.merchantOrderNos[0] || "-";
+  return entry.order?.orderSn || entry.application.expectedMerchantOrderNo || entry.merchantOrderNos[0] || "-";
 }
 
 function applicationListStoreText(entry, key, fallbackKey) {
-  return entry.order?.[key] || entry.order?.[fallbackKey] || "-";
+  if (entry.order?.[key] || entry.order?.[fallbackKey]) return entry.order[key] || entry.order[fallbackKey];
+  if (["storeName", "salesStore"].includes(key) || ["storeName", "salesStore"].includes(fallbackKey)) {
+    return entry.application.expectedStoreName || "-";
+  }
+  return entry.application.expectedStoreNo || "-";
 }
 
-function applicationListSellerText(entry, invoiceIndex, orderKey) {
-  const values = [...new Set((entry.application.invoices || [])
-    .map((invoice) => String(invoice?.[invoiceIndex] || "").trim())
-    .filter((value) => value && value !== "-"))];
-  return values.length ? values.join("、") : entry.order?.[orderKey] || "-";
+function applicationListSellerText(entry, _invoiceIndex, orderKey) {
+  const orderSeller = entry.order?.[orderKey];
+  if (orderSeller && orderSeller !== "-") return orderSeller;
+  const applicationFallback = orderKey === "subject"
+    ? entry.application.sellerName
+    : entry.application.sellerTaxNo;
+  return applicationFallback || "-";
 }
 
 function applicationListRow(entry) {
@@ -5292,7 +5378,7 @@ function applicationInvoiceTypeText(order, application) {
   return normalizeApplicationInvoiceType(
     application.invoiceType
       || application.invoices.find((invoice) => invoice?.[1])?.[1]
-      || order.invoiceOptions,
+      || order?.invoiceOptions,
   );
 }
 
@@ -5323,7 +5409,7 @@ function applicationRelatedOrders(application, currentOrder) {
     : application.relatedOrderIds?.length
       ? application.relatedOrderIds
       : [];
-  if (!references.length) return [currentOrder];
+  if (!references.length) return currentOrder ? [currentOrder] : [];
 
   const availableOrders = currentBrandOrders();
   const seen = new Set();
@@ -5333,7 +5419,7 @@ function applicationRelatedOrders(application, currentOrder) {
       || (
         typeof reference === "object"
         && reference
-        && (!reference.brandCode || reference.brandCode === currentOrder.brandCode)
+        && (!reference.brandCode || !currentOrder || reference.brandCode === currentOrder.brandCode)
           ? reference
           : null
       );
@@ -5412,21 +5498,19 @@ function openInvoiceFailureReason(order, application, invoiceIndex) {
 }
 
 function openInvoiceApplicationDetail(order, applicationId, origin) {
-  const authorizedOrder = currentBrandOrders().find((item) => item.orderSn === order?.orderSn);
-  if (!authorizedOrder) return;
-  const application = findExactOrderApplication(authorizedOrder, applicationId);
-  if (!application) return;
+  const context = findCurrentBrandApplicationContext(applicationId, order?.orderSn || "");
+  if (!context) return;
   state.applicationDetailOrigin = origin || (state.view === "applicationList" ? "applicationList" : "orders");
-  state.selectedOrder = authorizedOrder.orderSn;
-  state.selectedApplicationId = application.id;
+  state.selectedOrder = context.order?.orderSn || "";
+  state.selectedApplicationId = context.application.id;
   state.selectedInvoiceIndex = 0;
   state.selectedInvoiceNo = "";
   state.selectedInvoiceIdentity = "";
   setView("applicationDetail");
 }
 
-function bindInvoiceApplicationDetailActions(order) {
-  bindApplicationActions(order);
+function bindInvoiceApplicationDetailActions(order, selectedApplication) {
+  bindApplicationActions(order, selectedApplication);
   workspace.querySelectorAll("[data-application-related-order]").forEach((button) => {
     button.addEventListener("click", () => openOrderDetail(button.dataset.applicationRelatedOrder));
   });
@@ -5440,7 +5524,7 @@ function bindInvoiceApplicationDetailActions(order) {
   });
   workspace.querySelectorAll("[data-application-invoice-failure-index]").forEach((button) => {
     button.addEventListener("click", () => {
-      const application = findExactOrderApplication(order, state.selectedApplicationId);
+      const application = selectedApplication || findExactOrderApplication(order, state.selectedApplicationId);
       if (!application) return;
       openInvoiceFailureReason(order, application, Number(button.dataset.applicationInvoiceFailureIndex || 0));
     });
@@ -5464,11 +5548,12 @@ function renderInvoiceApplicationDetail() {
     return;
   }
   const { order, application } = context;
-  state.selectedOrder = order.orderSn;
+  state.selectedOrder = order?.orderSn || "";
   state.selectedApplicationId = application.id;
   const statusDescription = String(application.statusDescription || "").trim();
   const buyerType = application.buyerType === "personal" ? "个人" : "企业";
   const applicationListOrigin = state.applicationDetailOrigin === "applicationList";
+  const waitingForOrder = application.status === "待订单同步";
 
   workspace.innerHTML = `
     <div class="detail-page application-detail-page" aria-labelledby="applicationDetailTitle">
@@ -5515,7 +5600,7 @@ function renderInvoiceApplicationDetail() {
               { label: "操作", align: "right", fixed: "right" },
             ],
             applicationRelatedOrderRows(application, order),
-            "暂无关联订单",
+            waitingForOrder ? "订单尚未同步，暂无关联订单" : "暂无关联订单",
             "application-detail-related-orders-table"
           )}
         </section>
@@ -5533,7 +5618,7 @@ function renderInvoiceApplicationDetail() {
               { label: "操作", align: "right", fixed: "right" },
             ],
             applicationInvoiceRows(application, order),
-            "当前尚未生成发票",
+            waitingForOrder ? "订单同步并完成制票后，将在此展示发票信息" : "当前尚未生成发票",
             "application-detail-invoices-table"
           )}
         </section>
@@ -5561,7 +5646,7 @@ function renderInvoiceApplicationDetail() {
   `;
 
   bindBreadcrumbActions();
-  bindInvoiceApplicationDetailActions(order);
+  bindInvoiceApplicationDetailActions(order, application);
 }
 
 function renderInvoiceDetail() {
@@ -5809,6 +5894,7 @@ function renderLifecycleApplicationContent(application) {
       <div class="lifecycle-timeline-meta lifecycle-application-primary-meta">
         <span>申请来源：${escapeHtml(application.source)}</span>
         <span>开票金额：${applicationAmountMarkup(application)}</span>
+        <span>发票类型：${escapeHtml(normalizeApplicationInvoiceType(application.invoiceType))}</span>
         <span>申请号：${escapeHtml(application.applyNo)}</span>
       </div>
       <div class="lifecycle-timeline-meta lifecycle-application-buyer-meta">
@@ -5853,7 +5939,7 @@ function applicationHasDeliverableInvoices(application) {
 
 function applicationActionDefinitions(application) {
   const actions = [];
-  if (["开票中", "红冲中"].includes(application.status)) {
+  if (["待订单同步", "开票中", "红冲中"].includes(application.status)) {
     actions.push({ key: "refresh", label: "刷新" });
   } else if (["异常待处理", "待重试"].includes(application.status)) {
     actions.push({ key: "retry", label: "重试" });
@@ -5907,6 +5993,10 @@ function advanceRedFlushInvoice(invoice) {
 }
 
 function refreshApplicationResult(order, application) {
+  if (application.status === "待订单同步") {
+    application.lastCheckedAt = currentDateTimeText();
+    return;
+  }
   const isRedFlush = application.status === "红冲中";
   if (isRedFlush) {
     const redFlushInvoices = application.invoices.filter(isRedFlushInvoice);
@@ -5965,16 +6055,19 @@ function executeApplicationAction(action, order, application) {
   }
   if (action === "refresh") {
     refreshApplicationResult(order, application);
-    synchronizeRelatedApplicationCopies(order, application);
+    if (order) synchronizeRelatedApplicationCopies(order, application);
     render();
   }
 }
 
-function bindApplicationActions(order) {
+function bindApplicationActions(order, selectedApplication) {
   workspace.querySelectorAll("[data-application-action]").forEach((button) => {
     button.addEventListener("click", () => {
-      const application = materializeOrderApplications(order)
-        .find((item) => item.id === button.dataset.applicationId);
+      const application = selectedApplication?.id === button.dataset.applicationId
+        ? selectedApplication
+        : order
+          ? materializeOrderApplications(order).find((item) => item.id === button.dataset.applicationId)
+          : findCurrentBrandApplicationContext(button.dataset.applicationId)?.application;
       if (!application) return;
       executeApplicationAction(button.dataset.applicationAction, order, application);
     });
@@ -6743,7 +6836,7 @@ function returnStatusTone(status) {
 }
 
 function applicationStatusTone(status) {
-  if (["开票中", "红冲中"].includes(status)) return "processing";
+  if (["待订单同步", "开票中", "红冲中"].includes(status)) return "processing";
   if (status === "异常待处理") return "error";
   if (status === "待重试") return "warning";
   return "success";
