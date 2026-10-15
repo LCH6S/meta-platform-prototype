@@ -49,6 +49,21 @@
     {code:'BK001',name:'联名卡专享优惠',type:'银行优惠'},
     {code:'ALI099',name:'支付宝新客优惠',type:'支付优惠'}
   ];
+  // Business explanations for the existing demo recognition catalog; identifiers stay unchanged.
+  var fundingItemDescriptions={
+    '支付宝银行券':'订单使用支付宝相关银行券时，按达美乐提供的券信息识别的合作方出资部分，不包含用户购券实付金额。',
+    '支付宝支付立减':'订单通过支付宝支付时，由平台承担的支付立减金额，不包含商家自行承担的优惠。',
+    '支付宝联合活动补贴':'订单参与支付宝联合活动时，按达美乐提供的活动数据识别的合作方出资金额。',
+    '美团平台满减':'美团订单满减活动中由平台承担的金额，不包含同一活动中商家承担的优惠。',
+    '美团配送补贴':'美团订单配送费优惠中由平台承担的金额，不包含商家承担的配送优惠。',
+    '云闪付银行券':'订单使用云闪付相关银行券时，按达美乐提供的券信息识别的合作方出资部分。',
+    '抖音团购券':'订单核销抖音商品券时，按达美乐提供的券数据识别的平台补贴，不包含用户购券实付金额。',
+    '联名卡专享优惠':'订单使用联名卡合作优惠时，由合作方承担的出资金额，不包含商家自行承担的优惠。',
+    '支付宝新客优惠':'订单享受支付宝新客优惠时，由平台承担的优惠金额。',
+    '美团门店满减券':'订单使用美团门店满减券时，按达美乐提供的优惠数据识别的平台出资部分。',
+    '美团品牌活动券':'订单使用美团品牌活动券时，按达美乐提供的优惠数据识别的平台出资部分。'
+  };
+  function fundingItems(){return sources.map(function(s){return{code:s.code,name:s.name,description:s.description||fundingItemDescriptions[s.name]||'暂无描述'};});}
   function buyer(id,name,tax){return{id:id,name:name,tax:tax,email:'invoice@'+id+'.example',bank:'',bankAccount:'',phone:'',address:''};}
   var partners=[
     {id:'ali',name:'支付宝',code:'KH001',alias:'支付宝',category:'支付平台',remark:'',buyers:[buyer('ali-a','支付宝合作结算主体 A','91330000DEMO00001A'),buyer('ali-b','支付宝合作结算主体 B','91330000DEMO00002B')]},
@@ -76,6 +91,12 @@
   function getProject(id){return db.projects.find(function(p){return p.id===id;});}
   function getPartner(id){return db.partners.find(function(p){return p.id===id;});}
   function getBuyer(p){var partner=getPartner(p.partner);return partner&&partner.buyers.find(function(b){return b.id===p.buyer;})||{name:'未设置',tax:'-',email:''};}
+  function invoiceDefaults(b){
+    var p=getProject(b.project),snapshot=clone(b.buyerSnapshot||getBuyer(p)),partner=getPartner(b.partner||p.partner),current=partner&&partner.buyers.find(function(x){return snapshot.tax&&snapshot.tax!=='-'?x.tax===snapshot.tax:x.id===snapshot.id;});
+    var buyer=clone(snapshot);if(current)['address','phone','bank','bankAccount'].forEach(function(k){buyer[k]=current[k]||'';});
+    var source=current||snapshot,remarkOptions=(source.remarkOptions||[]).filter(function(k){return ['buyerContact','buyerBank','sellerContact','sellerBank'].includes(k);});
+    return{buyer:buyer,remarkOptions:remarkOptions.slice(),invoiceType:source.defaultType||b.invoiceType||p.invoiceType};
+  }
   function getSeller(id){return sellers.find(function(s){return s.id===id;});}
   function getStore(id){return stores.find(function(s){return s.id===id;});}
   function getPolicy(p,id){return p.policies.find(function(x){return x.id===id;});}
@@ -234,7 +255,7 @@
       if(p.demoCreated)return;
       var groups={};
       p.policies.forEach(function(pol,qi){
-        stores.forEach(function(store,si){
+        stores.filter(function(store){return !store.demoOnly;}).forEach(function(store,si){
           var sid=store.id,seller=policySellerId(pol,sid);
           var b=groupedSettlement(groups,m,p,seller,pol,function(){return m+'-'+p.id+'-'+(nextIndex++);});
           var count=(1050+pi*185+qi*90+si*31+n*17)*4;
@@ -273,7 +294,7 @@
       if(b.status==='issued'&&activeInvoice(b))done++;
     });
     var net=positive+negative;
-    return{positive:positive,negative:negative,net:net,count:count,issued:issued,expected:expected,adjustment:billCount?expected-net:0,unissued:expected-issued,progress:expected>0?Math.round(issued/expected*100):null,failed:failed,processing:processing,readyCount:readyCount,done:done,billCount:billCount,pendingCount:billCount-done,projectCount:projects.size};
+    return{positive:positive,negative:negative,net:net,count:count,issued:issued,expected:expected,adjustment:billCount?expected-net:0,unissued:expected-issued,progress:billCount>0?Math.round(done/billCount*100):null,failed:failed,processing:processing,readyCount:readyCount,done:done,billCount:billCount,pendingCount:billCount-done,projectCount:projects.size};
   }
   function monthTotal(m){return totals(month(m).bills);}
   function projectBills(m,p){return month(m).bills.filter(function(b){return b.project===p;});}
@@ -310,9 +331,11 @@
     var s=x.segment,b=x.bill,p=getProject(x.project),orderIndex=index+(s.orderIndexOffset||0),isRefund=s.kind==='refund';
     var when=isRefund?(s.originalMonth||[m,prevMonth(m),prevMonth(prevMonth(m))][index%3]):m;
     var order='DM'+when.replace('-','')+(p?(p.orderPartner||p.partner).toUpperCase():'ALI')+(s.source==='ALI099'?'NEW':'')+s.store+String(orderIndex+1).padStart(6,'0');
+    if(s.orderPrefix)order=s.orderPrefix+String(orderIndex+1).padStart(6,'0');
     var orderDay=1+orderIndex%27,orderOccurred=when+'-'+String(orderDay).padStart(2,'0')+' 12:'+String(orderIndex%60).padStart(2,'0');
+    if(s.orderOccurred)orderOccurred=s.orderOccurred;
     var refundOccurred=isRefund?m+'-'+String(s.refundDay||Math.max(orderDay,15+index%13)).padStart(2,'0')+' 15:'+String(index%60).padStart(2,'0'):null;
-    return{id:(b?b.id:m+'-unassigned')+'~'+x.si+'~'+index,order:order,month:m,occurred:refundOccurred||orderOccurred,orderOccurred:orderOccurred,refundOccurred:refundOccurred,store:s.store,source:s.source,policy:s.policy,project:x.project,seller:b?b.seller:'',item:b?b.item:'',amount:s.cents,kind:s.kind,bill:b?b.id:null,index:index,orderIndex:orderIndex};
+    return{demoOrder:!!s.demoOrder,id:(b?b.id:m+'-unassigned')+'~'+x.si+'~'+index,order:order,month:m,occurred:refundOccurred||orderOccurred,orderOccurred:orderOccurred,refundOccurred:refundOccurred,store:s.store,source:s.source,policy:s.policy,project:x.project,seller:b?b.seller:'',item:b?b.item:'',amount:s.cents,kind:s.kind,bill:b?b.id:null,index:index,orderIndex:orderIndex};
   }
   function records(m,p,filters,page,size){
     var segs=findSegments(m,p,filters),total=sum(segs,function(x){return x.segment.count;}),start=(page-1)*size,end=start+size,offset=0,rows=[];
@@ -329,12 +352,21 @@
     var p=getProject(r.project),rows=[];
     findSegments(r.month,null,{store:r.store,kind:r.kind}).forEach(function(x){
       var localIndex=r.orderIndex-(x.segment.orderIndexOffset||0);
-      if(getProject(x.project).partner!==p.partner||localIndex<0||localIndex>=x.segment.count)return;
+      if((!r.demoOrder&&getProject(x.project).partner!==p.partner)||localIndex<0||localIndex>=x.segment.count)return;
       var candidate=record(x,localIndex,r.month);if(candidate.order===r.order)rows.push(candidate);
     });return rows;
   }
   function now(){return new Date().toLocaleString('sv-SE').slice(0,16);}
-  function canIssue(b){return b&&b.month<TODAY&&['ready','failed','revoked'].includes(b.status)&&!b.activeRequest&&!activeInvoice(b);}
+  function formalStatus(b){
+    var rows=b.applications||[],active=rows.find(function(a){return a.id===b.activeRequest;}),last=rows[rows.length-1];
+    if(active&&['processing','retry_pending','red_pending'].includes(active.status))return active.type==='red'?'reversing':'processing';
+    if(last&&last.type==='red'&&last.status==='failed'&&activeInvoice(b))return 'reverse_failed';
+    if(activeInvoice(b))return 'issued';
+    if(last&&last.type==='red'&&last.status==='issued')return 'revoked';
+    if(last&&last.type==='blue'&&last.status==='failed')return 'failed';
+    return 'ready';
+  }
+  function canIssue(b){return b&&b.month<TODAY&&['ready','failed','revoked'].includes(b.status)&&!b.activeRequest&&!b.activeWorkflow&&!activeInvoice(b);}
   function validateAmount(amount){if(!Number.isSafeInteger(amount)||amount<=0)throw new Error('请填写大于 0 且最多两位小数的金额');}
   function adjustAmount(b,amount,reason){
     if(!canIssue(b))throw new Error('当前状态不能调整应开票金额');validateAmount(amount);
@@ -342,22 +374,23 @@
     if(!String(reason||'').trim())throw new Error('请填写金额调整说明');
     b.adjustments.push({from:b.invoiceAmount,to:amount,reason:reason.trim(),date:now(),operator:'集团财务'});b.invoiceAmount=amount;
   }
+  function nextApplicationId(b){var prefix='SQ'+b.id.replace(/-/g,'').toUpperCase()+'-',n=b.applications.length+1;while(b.applications.some(function(x){return x.id===prefix+n;})||(b.workflowTasks||[]).some(function(x){return x.id===prefix+n;}))n++;return prefix+n;}
   function startInvoice(bid,values){
-    var b=bill(bid);if(!canIssue(b))throw new Error('当前结算单不能发起开票');
+    var b=bill(bid),task=(b.workflowTasks||[]).find(function(t){return t.id===values.workflowId;}),fromWorkflow=!!(task&&task.status==='processing'&&task.preCompletedAt&&b.activeWorkflow===task.id&&!task.formalId);if(!canIssue(b)&&!fromWorkflow)throw new Error('当前结算单不能发起开票');if(fromWorkflow){var check=window.DemoPreissued.settlementReversalState(bid);if(check.pending||check.failed||check.issuing)throw new Error('预票红冲尚未全部成功，不能创建正式开票申请');}
     validateAmount(b.invoiceAmount);
     if(values.amount!==b.invoiceAmount)throw new Error('应开票金额与结算单不一致，请返回结算单详情核对');
     var recipients=invoiceRecipients({recipients:Array.isArray(values.emails)?values.emails:values.email?[values.email]:[]});
     if(recipients.some(function(email){return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);}))throw new Error('请填写有效的接收邮箱');
-    var p=getProject(b.project),buyer=clone(b.buyerSnapshot||getBuyer(p)),seller=clone(getSeller(b.seller));
+    var p=getProject(b.project),buyer=clone(values.issueBuyerSnapshot||invoiceDefaults(b).buyer),seller=clone(getSeller(b.seller));
     var manualRemark=String(values.remark||''),remarkOptions=(values.remarkOptions||[]).filter(function(k){return['buyerContact','buyerBank','sellerContact','sellerBank'].includes(k);});
-    var a={id:'SQ'+bid.replace(/-/g,'').toUpperCase()+'-'+(b.applications.length+1),type:'blue',amount:b.invoiceAmount,status:'processing',createdAt:now(),remark:composeInvoiceRemark(manualRemark,remarkOptions,buyer,seller),manualRemark:manualRemark,remarkOptions:remarkOptions,buyer:buyer,seller:seller,item:b.item,invoiceType:b.invoiceType||p.invoiceType,taxCode:b.taxCode,taxShortName:b.taxShortName,taxRate:b.taxRate,recipient:recipients[0]||'',recipients:recipients};
+    var a={workflowId:values.workflowId||'',retryOf:values.retryOf||'',batchId:values.batchId||'',preflight:!!values.preflight,stage:values.workflowId?'issuing':values.preflight?'preparing':'issuing',id:nextApplicationId(b),type:'blue',amount:b.invoiceAmount,status:'processing',createdAt:now(),remark:composeInvoiceRemark(manualRemark,remarkOptions,buyer,seller),manualRemark:manualRemark,remarkOptions:remarkOptions,buyer:buyer,seller:seller,item:b.item,invoiceType:b.invoiceType||p.invoiceType,taxCode:b.taxCode,taxShortName:b.taxShortName,taxRate:b.taxRate,recipient:recipients[0]||'',recipients:recipients};
     b.applications.push(a);b.activeRequest=a.id;b.status='processing';b.recipient=a.recipient;b.recipients=recipients.slice();b.invoiceRemark=manualRemark;b.invoiceRemarkOptions=remarkOptions.slice();b.attempts++;save();return a;
   }
   function startReversal(bid,reason){
     var b=bill(bid),blue=b&&activeInvoice(b);
     if(!blue||!['issued','reverse_failed'].includes(b.status))throw new Error('当前结算单不能撤销开票');
     if(!String(reason||'').trim())throw new Error('请填写撤销原因');
-    var a={id:'SQ'+bid.replace(/-/g,'').toUpperCase()+'-'+(b.applications.length+1),type:'red',amount:-blue.amount,status:'processing',createdAt:now(),reason:reason.trim(),remark:blue.remark||'',manualRemark:blue.manualRemark==null?blue.remark||'':blue.manualRemark,remarkOptions:clone(blue.remarkOptions||[]),originalId:blue.id,buyer:clone(blue.buyer),seller:clone(blue.seller),item:blue.item,invoiceType:blue.invoiceType,taxCode:blue.taxCode,taxShortName:blue.taxShortName,taxRate:blue.taxRate,recipient:blue.recipient,recipients:invoiceRecipients(blue)};
+    var a={id:nextApplicationId(b),type:'red',amount:-blue.amount,status:'processing',createdAt:now(),reason:reason.trim(),remark:blue.remark||'',manualRemark:blue.manualRemark==null?blue.remark||'':blue.manualRemark,remarkOptions:clone(blue.remarkOptions||[]),originalId:blue.id,buyer:clone(blue.buyer),seller:clone(blue.seller),item:blue.item,invoiceType:blue.invoiceType,taxCode:blue.taxCode,taxShortName:blue.taxShortName,taxRate:blue.taxRate,recipient:blue.recipient,recipients:invoiceRecipients(blue)};
     b.applications.push(a);b.activeRequest=a.id;b.status='reversing';save();return a;
   }
   function retryRequest(bid,aid){
@@ -390,15 +423,18 @@
       b.status=a.type==='red'?'reversing':'processing';save();return;
     }
     if(outcome==='failed'){
+      if(a.preflight&&a.type==='blue')a.failureStage=update.failureStage||a.stage;
       a.status='failed';a.error=String(update.error||'未返回失败原因');a.completedAt=update.completedAt||now();
       b.status=a.type==='red'?'reverse_failed':'failed';delete b.activeRequest;save();return;
     }
+    if(a.type==='blue'&&a.preflight){var pre=window.DemoPreissued;if(!pre)throw new Error('预开发票服务不可用');var check=pre.settlementReversalState(bid);if(check.pending||check.failed||check.issuing)throw new Error('关联预票尚未全部红冲成功');}
     var completedAt=update.completedAt||now();
-    var inv={id:'FP'+bid.replace(/-/g,'').toUpperCase()+'-'+b.applications.length,amount:a.amount,tone:a.type,date:completedAt,recipient:a.recipient,recipients:invoiceRecipients(a),sent:false,applicationId:a.id,originalId:a.originalId||null,buyer:clone(a.buyer),seller:clone(a.seller),item:a.item,invoiceType:a.invoiceType,taxCode:a.taxCode,taxShortName:a.taxShortName,taxRate:a.taxRate,remark:a.remark,manualRemark:a.manualRemark==null?a.remark:a.manualRemark,remarkOptions:clone(a.remarkOptions||[]),reason:a.reason||''};
+    var invoicePrefix='FP'+bid.replace(/-/g,'').toUpperCase()+'-',invoiceNo=b.applications.length;while(b.invoices.some(function(x){return x.id===invoicePrefix+invoiceNo;}))invoiceNo++;
+    var inv={id:invoicePrefix+invoiceNo,amount:a.amount,tone:a.type,date:completedAt,recipient:a.recipient,recipients:invoiceRecipients(a),sent:false,applicationId:a.id,originalId:a.originalId||null,buyer:clone(a.buyer),seller:clone(a.seller),item:a.item,invoiceType:a.invoiceType,taxCode:a.taxCode,taxShortName:a.taxShortName,taxRate:a.taxRate,remark:a.remark,manualRemark:a.manualRemark==null?a.remark:a.manualRemark,remarkOptions:clone(a.remarkOptions||[]),reason:a.reason||''};
     if(a.type==='red'){var blue=b.invoices.find(function(x){return x.id===a.originalId;});if(!blue||blue.reversedBy)return;blue.reversedBy=inv.id;}
     else if(activeInvoice(b))return;
-    b.invoices.push(inv);a.invoiceId=inv.id;a.status='issued';a.completedAt=completedAt;delete a.error;
+    b.invoices.push(inv);a.invoiceId=inv.id;a.status='issued';a.stage='complete';a.completedAt=completedAt;delete a.error;
     b.status=a.type==='red'?'revoked':'issued';b.issued=issuedAmount(b);delete b.activeRequest;save();if(a.type==='blue'&&window.DemoPreissued)window.DemoPreissued.onSettlementSuccess(b,inv);return inv;
   }
-  window.DemoData={refreshBill:refreshBill,retryRequest:retryRequest,refreshRequest:refreshRequest,invoiceRecipients:invoiceRecipients,composeInvoiceRemark:composeInvoiceRemark,invoiceItemLabel:invoiceItemLabel,historyMonths:historyMonths,projectHistory:projectHistory,issuedAmount:issuedAmount,monthProjects:monthProjects,policySummaries:policySummaries,DATA_UPDATED_AT:'2026-09-28 23:59',db:db,save:save,month:month,bill:bill,totals:totals,monthTotal:monthTotal,projectBills:projectBills,records:records,getRecord:getRecord,orderParts:orderParts,findSegments:findSegments,record:record,getProject:getProject,getPartner:getPartner,getBuyer:getBuyer,getSeller:getSeller,getStore:getStore,getPolicy:getPolicy,lookupTaxCode:lookupTaxCode,taxRates:taxCatalog.rates,taxCatalog:taxCatalog,policySellerId:policySellerId,matchingPolicies:matchingPolicies,stores:stores,sellers:sellers,sources:sources,TODAY:TODAY,PREVIOUS:previous,KEY:KEY,sum:sum,normalizeBill:normalizeBill,settlementNet:settlementNet,activeInvoice:activeInvoice,canIssue:canIssue,adjustAmount:adjustAmount,startInvoice:startInvoice,startReversal:startReversal,completeRequest:completeRequest};
+  window.DemoData={invoiceDefaults:invoiceDefaults,formalStatus:formalStatus,fundingItems:fundingItems,refreshBill:refreshBill,retryRequest:retryRequest,refreshRequest:refreshRequest,invoiceRecipients:invoiceRecipients,composeInvoiceRemark:composeInvoiceRemark,invoiceItemLabel:invoiceItemLabel,historyMonths:historyMonths,projectHistory:projectHistory,issuedAmount:issuedAmount,monthProjects:monthProjects,policySummaries:policySummaries,DATA_UPDATED_AT:'2026-09-28 23:59',db:db,save:save,month:month,bill:bill,totals:totals,monthTotal:monthTotal,projectBills:projectBills,records:records,getRecord:getRecord,orderParts:orderParts,findSegments:findSegments,record:record,getProject:getProject,getPartner:getPartner,getBuyer:getBuyer,getSeller:getSeller,getStore:getStore,getPolicy:getPolicy,lookupTaxCode:lookupTaxCode,taxRates:taxCatalog.rates,taxCatalog:taxCatalog,policySellerId:policySellerId,matchingPolicies:matchingPolicies,stores:stores,sellers:sellers,sources:sources,TODAY:TODAY,PREVIOUS:previous,KEY:KEY,sum:sum,normalizeBill:normalizeBill,settlementNet:settlementNet,activeInvoice:activeInvoice,canIssue:canIssue,adjustAmount:adjustAmount,startInvoice:startInvoice,startReversal:startReversal,completeRequest:completeRequest};
 })();

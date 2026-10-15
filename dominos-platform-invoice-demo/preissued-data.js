@@ -1,7 +1,7 @@
 (function(){
   'use strict';
   var D=window.DemoData,O=window.DemoOrderData,KEY='dominos-platform-preissued-v1',store;
-  var BUYER='预开平台发票',ITEM='餐饮',RATE=6,CODE='3070401000000000000';
+  var BUYER='个人',ITEM='餐饮',RATE=6,CODE='3070401000000000000';
   function clone(v){return JSON.parse(JSON.stringify(v));}
   function now(){return new Date().toLocaleString('sv-SE').slice(0,16);}
   function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){return null;}}
@@ -15,13 +15,14 @@
   function groupFor(id){var parts=String(id).split('~');if(parts.length!==3||!/^\d+$/.test(parts[2]))return null;var g=store.groups[parts[0]+'~'+parts[1]],index=Number(parts[2]);return g&&index<g.rawCount&&included(g,index)?{g:g,index:index}:null;}
   function makeGroup(b,si,seed){
     var s=b.segments[si],r=D.record({bill:b,segment:s,si:si,project:b.project},0,b.month),p=D.getProject(b.project),st=D.getStore(s.store),pol=(b.policySnapshot||[]).find(function(x){return x.id===s.policy;}),offset=s.orderIndexOffset||0,issued=O.fixtureInvoiceRange(s),first=issued.first;
-    return{id:b.id+'~'+si,code:b.id.replace(/-/g,'').toUpperCase()+'S'+si,billId:b.id,month:b.month,project:p.id,projectName:p.name,policy:s.policy,policyName:pol?pol.name:'历史政策',store:s.store,storeName:st.name,source:s.source,rawCount:s.count,first:first,step:issued.step,count:seed?issued.count:0,extra:[],offset:offset,orderPrefix:r.order.slice(0,-6),amount:s.cents,seller:clone(D.getSeller(st.seller)),invoiceType:'增值税普通发票',taxCode:CODE,taxShortName:D.lookupTaxCode(CODE).shortName,taxRate:RATE};
+    return{demoOrder:!!s.demoOrder,id:b.id+'~'+si,code:b.id.replace(/-/g,'').toUpperCase()+'S'+si,billId:b.id,month:b.month,project:p.id,projectName:p.name,policy:s.policy,policyName:pol?pol.name:'历史政策',store:s.store,storeName:st.name,source:s.source,rawCount:s.count,first:first,step:issued.step,count:seed?issued.count:0,extra:[],offset:offset,orderPrefix:r.order.slice(0,-6),amount:s.cents,seller:clone(D.getSeller(st.seller)),invoiceType:'增值税普通发票',taxCode:CODE,taxShortName:D.lookupTaxCode(CODE).shortName,taxRate:RATE};
   }
   function queueForSuccess(b,inv,persist){
     if(!b||b.month>=D.TODAY||!inv||inv.amount<=0)return false;
     var groups=Object.values(store.groups).filter(function(g){return g.billId===b.id&&(g.count||g.extra.length);});if(!groups.length)return false;
     var changed=false,job=store.jobs[b.id];
     if(!job){store.jobs[b.id]={billId:b.id,invoiceId:inv.id,invoiceDate:inv.date,status:'queued',createdAt:now()};job=store.jobs[b.id];changed=true;}
+    if(job.beforeSettlement&&!job.invoiceId){job.invoiceId=inv.id;job.invoiceDate=inv.date;changed=true;}
     groups.forEach(function(g){(g.extra||[]).forEach(function(index){var ov=store.overrides[recordId(g,index)];if(ov&&ov.status==='waiting'){ov.status='queued';ov.createdAt=now();ov.triggerInvoiceId=inv.id;changed=true;}});});
     if(changed&&persist!==false)save();return changed;
   }
@@ -60,23 +61,38 @@
   }
   function get(id){
     var found=groupFor(id);if(!found)return null;var g=found.g,index=found.index,ov=store.overrides[id]||{},job=store.jobs[g.billId],orderIndex=index+g.offset;
-    var number=ov.number||invoiceId(g,index),date=ov.date||g.month+'-'+String(1+orderIndex%27).padStart(2,'0')+' 12:'+String(orderIndex%60).padStart(2,'0'),status=ov.status||job&&job.status||'waiting';
-    return{id:id,number:number,fundingId:id,month:g.month,project:g.project,projectName:g.projectName,policy:g.policy,policyName:g.policyName,store:g.store,storeName:g.storeName,source:g.source,order:g.orderPrefix+String(orderIndex+1).padStart(6,'0'),date:date,amount:ov.amount==null?g.amount:ov.amount,buyerName:BUYER,item:ITEM,seller:clone(ov.seller||g.seller),invoiceType:ov.invoiceType||g.invoiceType,taxCode:ov.taxCode||g.taxCode,taxShortName:ov.taxShortName||g.taxShortName,taxRate:ov.taxRate==null?g.taxRate:ov.taxRate,status:status,billId:g.month<D.TODAY?g.billId:'',triggerInvoice:status==='waiting'?'':ov.triggerInvoiceId||job&&job.invoiceId||'',requestedAt:status==='waiting'?'':ov.requestedAt||ov.createdAt||job&&job.startedAt||job&&job.createdAt||'',completedAt:['reversed','failed'].includes(status)?ov.completedAt||(!ov.status&&job&&job.completedAt)||'':'',error:ov.error||'',redNumber:status==='reversed'?(ov.redNumber||'HY'+g.code+'-'+String(index+1).padStart(6,'0')):'',retryCount:ov.retryCount||0};
+    var number=ov.number||invoiceId(g,index),date=ov.date||g.month+'-'+String(1+orderIndex%27).padStart(2,'0')+' 12:'+String(orderIndex%60).padStart(2,'0'),status=ov.status||(job&&baseIndex(g,index)&&job.progress&&((index-g.first)/g.step)<(job.progress[g.id]||0)?'reversed':job&&job.status)||'waiting';
+    return{settlementApplication:job&&job.applicationId||'',beforeSettlement:!!(job&&job.beforeSettlement),demoOrder:!!g.demoOrder,id:id,number:number,fundingId:id,month:g.month,project:g.project,projectName:g.projectName,policy:g.policy,policyName:g.policyName,store:g.store,storeName:g.storeName,source:g.source,order:g.orderPrefix+String(orderIndex+1).padStart(6,'0'),date:date,amount:ov.amount==null?g.amount:ov.amount,buyerName:BUYER,item:ITEM,seller:clone(ov.seller||g.seller),invoiceType:ov.invoiceType||g.invoiceType,taxCode:ov.taxCode||g.taxCode,taxShortName:ov.taxShortName||g.taxShortName,taxRate:ov.taxRate==null?g.taxRate:ov.taxRate,status:status,billId:g.month<D.TODAY?g.billId:'',triggerInvoice:status==='waiting'?'':ov.triggerInvoiceId||job&&job.invoiceId||'',requestedAt:status==='waiting'?'':ov.requestedAt||ov.createdAt||job&&job.startedAt||job&&job.createdAt||'',completedAt:['reversed','failed'].includes(status)?ov.completedAt||(!ov.status&&job&&(job.completedAt||job.lastProgressAt))||'':'',error:ov.error||'',redNumber:status==='reversed'?(ov.redNumber||'HY'+g.code+'-'+String(index+1).padStart(6,'0')):'',retryCount:ov.retryCount||0};
   }
   function runs(g){
     var job=store.jobs[g.billId],baseStatus=job?job.status:'waiting',special=[];
     Object.keys(store.overrides).forEach(function(id){if(!id.startsWith(g.id+'~'))return;var index=Number(id.split('~')[2]);if(baseIndex(g,index))special.push(index);});special.sort(function(a,b){return a-b;});
     var result=[],cursor=0;
     function add(start,step,count,status,amount){if(count)result.push({start:start,step:step,count:count,status:status,amount:amount});}
-    special.forEach(function(index){var ordinal=(index-g.first)/g.step,ov=store.overrides[recordId(g,index)];add(g.first+cursor*g.step,g.step,ordinal-cursor,baseStatus,g.amount);add(index,1,1,ov.status||baseStatus,ov.amount==null?g.amount:ov.amount);cursor=ordinal+1;});
-    add(g.first+cursor*g.step,g.step,g.count-cursor,baseStatus,g.amount);
+    function addBase(start,step,count){var done=job&&job.progress&&job.progress[g.id]||0,ordinal=(start-g.first)/g.step,completed=Math.max(0,Math.min(count,done-ordinal));add(start,step,completed,'reversed',g.amount);add(start+completed*step,step,count-completed,baseStatus,g.amount);}
+    special.forEach(function(index){var ordinal=(index-g.first)/g.step,ov=store.overrides[recordId(g,index)];addBase(g.first+cursor*g.step,g.step,ordinal-cursor);add(index,1,1,ov.status||baseStatus,ov.amount==null?g.amount:ov.amount);cursor=ordinal+1;});
+    addBase(g.first+cursor*g.step,g.step,g.count-cursor);
     (g.extra||[]).slice().sort(function(a,b){return a-b;}).forEach(function(index){var ov=store.overrides[recordId(g,index)]||{};add(index,1,1,ov.status||baseStatus,ov.amount==null?g.amount:ov.amount);});
     return result;
+  }
+  // Compact membership runs: filtering funding never materializes every pre-invoice.
+  function fundingStatusRuns(bid,si,total,kind,wanted){
+    if(kind!=='positive')return [];
+    var gid=bid+'~'+si,g=store.groups[gid],out=[];
+    if(wanted!=='none'){
+      if(g)runs(g).forEach(function(run){if(applicationStatus({status:run.status})===wanted)out.push({start:run.start,step:run.step,count:Math.max(0,Math.min(run.count,Math.ceil((total-run.start)/run.step)))});});
+      Object.keys(store.applications||{}).forEach(function(id){if(!id.startsWith(gid+'~')||get(id))return;var index=Number(id.split('~')[2]);if(index>=0&&index<total&&store.applications[id].status===wanted)out.push({start:index,step:1,count:1});});
+      return out.filter(function(r){return r.count>0;}).sort(function(a,b){return a.start-b.start;});
+    }
+    var base=[];function add(start,step,count){if(count>0)base.push({start:start,step:step,count:count});}
+    if(g&&g.count){var last=Math.min(total-1,g.first+(g.count-1)*g.step);add(0,1,Math.min(total,g.first));for(var rem=1;rem<g.step;rem++){var start=g.first+rem;add(start,g.step,Math.floor((last-start)/g.step)+1);}add(last+1,1,total-last-1);}else add(0,1,total);
+    var excluded=new Set(g?g.extra||[]:[]);Object.keys(store.applications||{}).forEach(function(id){if(id.startsWith(gid+'~'))excluded.add(Number(id.split('~')[2]));});
+    var points=Array.from(excluded).sort(function(a,b){return a-b;});base.forEach(function(run){var cursor=0;points.forEach(function(index){var ordinal=(index-run.start)/run.step;if(!Number.isInteger(ordinal)||ordinal<cursor||ordinal>=run.count)return;if(ordinal>cursor)out.push({start:run.start+cursor*run.step,step:run.step,count:ordinal-cursor});cursor=ordinal+1;});if(cursor<run.count)out.push({start:run.start+cursor*run.step,step:run.step,count:run.count-cursor});});return out.sort(function(a,b){return a.start-b.start;});
   }
   function list(q,page,size){
     q=Object.assign({},q||{});q.number=String(q.number||'').trim();q.order=String(q.order||'').trim();page=page||1;size=size||10;var total=0,amount=0,rows=[],skip=(page-1)*size,counts={waiting:0,queued:0,reversing:0,failed:0,reversed:0};
     Object.values(store.groups).sort(function(a,b){return b.month.localeCompare(a.month)||a.code.localeCompare(b.code);}).forEach(function(g){
-      if(q.month&&g.month!==q.month||q.project&&g.project!==q.project||q.store&&g.store!==q.store)return;
+      if(q.bill&&g.billId!==q.bill||q.month&&g.month!==q.month||q.project&&g.project!==q.project||q.store&&g.store!==q.store)return;
       runs(g).forEach(function(run){
         if(q.status&&q.status!==run.status)return;
         if(!q.number&&!q.order){
@@ -99,8 +115,16 @@
   }
   function finishPending(){
     var changed=finishApplications();fresh();var time=now();
-    Object.values(store.jobs).forEach(function(job){if(job.status==='reversing'){job.status='reversed';job.completedAt=time;changed=true;}});
-    Object.values(store.overrides).forEach(function(ov){if(ov.status==='reversing'){ov.status='reversed';ov.completedAt=time;delete ov.error;changed=true;}});
+    Object.values(store.jobs).forEach(function(job){
+      if(!job.beforeSettlement){if(job.status==='reversing'){job.status='reversed';job.completedAt=time;changed=true;}return;}
+      var groups=Object.values(store.groups).filter(function(g){return g.billId===job.billId;}),overrides=Object.keys(store.overrides).filter(function(id){return id.startsWith(job.billId+'~')&&store.overrides[id].status==='reversing';});
+      if(job.status!=='reversing'&&!overrides.length)return;
+      job.progress=job.progress||{};var remaining=0;
+      if(job.status==='reversing')groups.forEach(function(g){var done=job.progress[g.id]||0;job.progress[g.id]=Math.min(g.count,done+Math.max(1,Math.ceil(g.count/6)));remaining+=g.count-job.progress[g.id];});
+      var limit=Math.max(1,Math.ceil(overrides.length/6));overrides.slice(0,limit).forEach(function(id){var ov=store.overrides[id];ov.status='reversed';ov.completedAt=time;delete ov.error;});
+      if(!remaining&&overrides.length<=limit){job.status='reversed';job.completedAt=time;}job.lastProgressAt=time;changed=true;
+    });
+    Object.keys(store.overrides).forEach(function(id){var ov=store.overrides[id],job=store.jobs[id.split('~')[0]];if(ov.status==='reversing'&&!(job&&job.beforeSettlement)){ov.status='reversed';ov.completedAt=time;delete ov.error;changed=true;}});
     if(!store.fixtureFailuresApplied&&store.fixtureFailureIds.every(function(id){var inv=get(id);return inv&&inv.status==='reversed';})){
       store.fixtureFailureIds.forEach(function(id){store.overrides[id]={status:'failed',error:'开票服务响应超时，请稍后重试。',completedAt:time};});store.fixtureFailuresApplied=true;changed=true;
     }
@@ -140,7 +164,7 @@
     O.invalidate();return invoices;
   }
   function requestNumber(id){return 'YKSQ'+id.replace(/-/g,'').replace(/~/g,'-').toUpperCase();}
-  function applicationStatus(inv){return {waiting:'completed',queued:'revoking',reversing:'revoking',failed:'failed',reversed:'revoked'}[inv.status];}
+  function applicationStatus(inv){return {waiting:'completed',queued:'revoking',reversing:'revoking',failed:'reverse_failed',reversed:'revoked'}[inv.status];}
   function application(id){
     var inv=get(id),a=(store.applications||{})[id];
     if(inv)return Object.assign({},inv,{requestNumber:a&&a.requestNumber||requestNumber(id),appliedAt:a&&a.createdAt||inv.date,applicationStatus:applicationStatus(inv),failureStage:inv.status==='failed'?'撤销':'',origin:'随订单开票',hasInvoice:true});
@@ -181,9 +205,9 @@
       chunks.push({g:g,start:index,step:step,count:count,date:date});total+=count;
     }
     Object.values(store.groups).forEach(function(g){
-      if(!matchText(g.storeName+' '+g.store,q.store))return;
+      if(q.bill&&g.billId!==q.bill||!matchText(g.storeName+' '+g.store,q.store))return;
       runs(g).forEach(function(run){
-        var status=applicationStatus({status:run.status});if(q.status&&q.status!==status)return;
+        if(q.failureStage==='reversal'&&run.status!=='failed')return;var status=applicationStatus({status:run.status});if(q.status&&q.status!==status)return;
         var firstId=recordId(g,run.start),customDate=store.applications[firstId]&&store.applications[firstId].createdAt||store.overrides[firstId]&&store.overrides[firstId].date;
         if(customDate){add(g,run.start,run.step,run.count,customDate,status);return;}
         if(q.createdFrom&&g.month<q.createdFrom.slice(0,7)||q.createdTo&&g.month>q.createdTo.slice(0,7))return;
@@ -193,12 +217,12 @@
         for(var j=0;j<Math.min(run.count,period);j++){var index=run.start+j*run.step,ordinal=index+g.offset,date=g.month+'-'+String(1+ordinal%27).padStart(2,'0')+' 12:'+String(ordinal%60).padStart(2,'0');add(g,index,run.step*period,Math.ceil((run.count-j)/period),date,status);}
       });
     });
-    Object.keys(store.applications||{}).forEach(function(id){if(get(id))return;var a=application(id);if(!a)return;var parts=id.split('~'),b=D.bill(parts[0]),g=store.groups[parts[0]+'~'+parts[1]]||makeGroup(b,Number(parts[1]),false);add(g,Number(parts[2]),1,1,a.appliedAt,a.applicationStatus);});
+    Object.keys(store.applications||{}).forEach(function(id){if(q.failureStage==='reversal'||q.bill&&!id.startsWith(q.bill+'~')||get(id))return;var a=application(id);if(!a)return;var parts=id.split('~'),b=D.bill(parts[0]),g=store.groups[parts[0]+'~'+parts[1]]||makeGroup(b,Number(parts[1]),false);add(g,Number(parts[2]),1,1,a.appliedAt,a.applicationStatus);});
     chunks.sort(function(a,b){return b.date.localeCompare(a.date)||a.g.id.localeCompare(b.g.id)||a.start-b.start;});
     var skip=(page-1)*size,rows=[];chunks.forEach(function(c){if(skip>=c.count){skip-=c.count;return;}if(rows.length>=size)return;var take=Math.min(c.count-skip,size-rows.length);for(var i=0;i<take;i++)rows.push(application(recordId(c.g,c.start+(skip+i)*c.step)));skip=0;});return{total:total,rows:rows};
   }
   function retryApplication(id){
-    fresh();var a=application(id);if(!a||a.applicationStatus!=='failed')throw new Error('当前申请不能重试');
+    fresh();var a=application(id);if(!a||!['failed','reverse_failed'].includes(a.applicationStatus))throw new Error('当前申请不能重试');
     if(a.hasInvoice){retry(id);return application(id);}
     var saved=store.applications[id];saved.history=saved.history||[];saved.history.push({error:saved.error,date:now()});saved.status='processing';saved.retryCount++;saved.error='';saved.run=true;save();return application(id);
   }
@@ -207,10 +231,40 @@
     fresh();var ids=Object.keys(store.applications||{}).filter(function(id){var a=store.applications[id];return a.status==='processing'&&a.run&&!get(id);});
     ids.forEach(function(id){var a=store.applications[id];registerIssuedInvoice(id,{number:'YK'+id.replace(/-/g,'').replace(/~/g,'-').toUpperCase(),orderInvoiceRequestId:a.orderInvoiceRequestId,amount:a.amount,date:now(),seller:a.seller,invoiceType:a.invoiceType});});return !!ids.length;
   }
+  function initOrderExamples(){
+    if(!window.DemoOrderExamples||store.demoOrderExamplesVersion)return;
+    window.DemoOrderExamples.orders.forEach(function(o){
+      var documents=o.fundingIds.map(function(id,i){var state=o.preStates[i];if(state==='none')return null;return{fundingId:id,number:'YK-EX-'+o.number+'-'+(i+1),date:o.createdAt,amount:D.getRecord(id).amount,status:['reversed','reverse_failed'].includes(state)?'issued':state,error:state==='failed'?'开票额度不足，请处理后重试。':''};}).filter(Boolean);
+      var result={order:o.number,requestId:'C-EX-'+o.number,createdAt:o.createdAt,platformInvoices:documents};if(o.consumerState!=='none')result.consumer={status:o.consumerState,amount:o.paid};applyOrderInvoiceResult(result);
+      o.fundingIds.forEach(function(id,i){var state=o.preStates[i];if(!['reversed','reverse_failed'].includes(state))return;
+        var ov=store.overrides[id],bid=id.split('~')[0];ov.status=state==='reversed'?'reversed':'failed';ov.requestedAt='2026-09-01 10:00';ov.completedAt='2026-09-01 10:05';
+        if(state==='reversed'){ov.redNumber='HY-EX-'+o.number+'-'+(i+1);if(store.jobs[bid]){store.jobs[bid].status='reversed';store.jobs[bid].completedAt=ov.completedAt;}}
+        else ov.error='红冲服务响应超时，请稍后重试。';save();
+      });
+    });store.demoOrderExamplesVersion=1;save();O.invalidate();
+  }
+  function settlementReversalState(bid){
+    fresh();var summary={total:0,reversed:0,pending:0,waiting:0,reversing:0,failed:0,issuing:0};
+    Object.values(store.groups).filter(function(g){return g.billId===bid;}).forEach(function(g){runs(g).forEach(function(run){summary.total+=run.count;if(run.status==='reversed')summary.reversed+=run.count;else if(run.status==='failed')summary.failed+=run.count;else{summary.pending+=run.count;if(run.status==='reversing')summary.reversing+=run.count;else summary.waiting+=run.count;}});});
+    Object.keys(store.applications||{}).forEach(function(id){var a=store.applications[id];if(id.startsWith(bid+'~')&&a.status==='processing'&&!get(id))summary.issuing++;});return summary;
+  }
+  function pendingSettlementApplications(bid){fresh();return Object.keys(store.applications||{}).filter(function(id){return id.startsWith(bid+'~')&&store.applications[id].status==='processing'&&!get(id);}).map(application);}
+  function prepareSettlementReversal(bid,applicationId){
+    fresh();var b=D.bill(bid);if(!b||b.month>=D.TODAY||b.activeRequest!==applicationId&&b.activeWorkflow!==applicationId)throw new Error('结算开票申请已变化');
+    var groups=Object.values(store.groups).filter(function(g){return g.billId===bid;});
+    if(!groups.length)return settlementReversalState(bid);
+    var check=settlementReversalState(bid);if(check.issuing)throw new Error('存在处理中的预开申请，请处理后重新提交');
+    if(!check.pending&&!check.failed)return check;
+    var job=store.jobs[bid];
+    if(!job){job=store.jobs[bid]={billId:bid,invoiceId:'',beforeSettlement:true,status:'queued',createdAt:now(),applicationId:applicationId};}
+    else{job.beforeSettlement=true;job.applicationId=applicationId;if(!['reversed','reversing'].includes(job.status)){job.status='queued';job.createdAt=now();}}
+    groups.forEach(function(g){Object.keys(store.overrides).filter(function(id){return id.startsWith(g.id+'~');}).forEach(function(id){var ov=store.overrides[id];if(['waiting','failed'].includes(ov.status)){if(ov.status==='failed'){ov.history=ov.history||[];ov.history.push({error:ov.error,date:ov.completedAt});ov.retryCount=(ov.retryCount||0)+1;}ov.status='queued';ov.requestedAt=now();delete ov.error;delete ov.completedAt;}});});
+    save();return settlementReversalState(bid);
+  }
   function invoiceSnapshot(id,red){
     var p=get(id);if(!p||red&&p.status!=='reversed')return null;
     return{id:red?p.redNumber:p.number,amount:red?-p.amount:p.amount,tone:red?'red':'blue',date:red?p.completedAt:p.date,buyer:{name:BUYER,tax:'',address:'',phone:'',bank:'',bankAccount:''},seller:p.seller,item:ITEM,taxCode:p.taxCode,taxShortName:p.taxShortName,taxRate:p.taxRate,invoiceType:p.invoiceType,remark:'',originalId:red?p.number:null};
   }
-  init();
-  window.DemoPreissued={application:application,applications:applications,registerApplication:registerApplication,retryApplication:retryApplication,refreshApplication:refreshApplication,KEY:KEY,BUYER:BUYER,ITEM:ITEM,get:get,list:list,reconcile:reconcile,refresh:function(){fresh();reconcile();O.invalidate();},onSettlementSuccess:function(b,inv){fresh();return queueForSuccess(b,inv);},startPending:startPending,finishPending:finishPending,retry:retry,registerIssuedInvoice:registerIssuedInvoice,applyOrderInvoiceResult:applyOrderInvoiceResult,invoiceSnapshot:invoiceSnapshot,orderInvoiceEvent:orderInvoiceEvent,months:function(){return Array.from(new Set(Object.values(store.groups).map(function(g){return g.month;}))).sort().reverse();}};
+  init();initOrderExamples();
+  window.DemoPreissued={beginFundingQuery:fresh,fundingStatusRuns:fundingStatusRuns,pendingSettlementApplications:pendingSettlementApplications,settlementReversalState:settlementReversalState,prepareSettlementReversal:prepareSettlementReversal,application:application,applications:applications,registerApplication:registerApplication,retryApplication:retryApplication,refreshApplication:refreshApplication,KEY:KEY,BUYER:BUYER,ITEM:ITEM,get:get,list:list,reconcile:reconcile,refresh:function(){fresh();reconcile();O.invalidate();},onSettlementSuccess:function(b,inv){fresh();return queueForSuccess(b,inv);},startPending:startPending,finishPending:finishPending,retry:retry,registerIssuedInvoice:registerIssuedInvoice,applyOrderInvoiceResult:applyOrderInvoiceResult,invoiceSnapshot:invoiceSnapshot,orderInvoiceEvent:orderInvoiceEvent,months:function(){return Array.from(new Set(Object.values(store.groups).map(function(g){return g.month;}))).sort().reverse();}};
 })();

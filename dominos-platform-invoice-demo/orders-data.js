@@ -17,10 +17,11 @@
   var cities={SH001:['上海市','上海市'],SH002:['上海市','上海市'],HZ001:['浙江省','杭州市'],BJ001:['北京市','北京市'],BJ002:['北京市','北京市'],GZ001:['广东省','广州市']};
   // Synthetic order-invoicing outcomes; funding generation itself does not issue invoices.
   function fixtureInvoiceEvent(r){
-    if(!r||r.orderIndex%3!==0)return null;
+    if(!r||r.demoOrder||r.orderIndex%3!==0)return null;
     return{id:'C'+r.order,createdAt:r.orderOccurred,amount:9000,status:'issued'};
   }
   function fixtureInvoiceRange(segment){
+    if(segment.demoOrder)return{first:0,step:1,count:0};
     var first=(3-(segment.orderIndexOffset||0)%3)%3;
     return{first:first,step:3,count:segment.count>first?Math.ceil((segment.count-first)/3):0};
   }
@@ -29,15 +30,26 @@
     if(!r)return null;var store=D.getStore(r.store),parts=D.orderParts(r),platform=D.sum(parts,function(x){return Math.abs(x.amount);}),paid=9000,amount=paid+platform,region=cities[r.store]||['-','-'],event=invoiceEvent(r);
     return{id:r.id,number:r.order,province:region[0],city:region[1],store:store.name,storeCode:store.id,amount:amount,buyerPhone:'13800003000',recipientPhone:'13800003000',channel:'微信小程序',createdAt:r.orderOccurred,completedAt:r.orderOccurred,scene:'堂食',paymentChannel:'线上微信支付',paymentCode:'PM004',original:amount+1500,discount:1500,paid:paid,returned:r.kind==='refund',invoiced:!!event&&event.status==='issued',applications:event?[{id:event.id,amount:paid,phone:'',status:event.status==='issued'?'已完成':event.status==='failed'?'开票失败':'处理中',origin:'用户发起',invoiceType:'增值税电子普通发票',appliedAt:event.createdAt}]:[],fundingRecord:r};
   }
+  function exampleOrder(sample,id){
+    var o=Object.assign({},sample),P=window.DemoPreissued,event=P&&P.orderInvoiceEvent(o.number),consumer=event?event.status:'none';
+    if(o.channel==='美团外卖')o.paymentCode='PM012';
+    o.id=id||sample.id;o.fundingRecord=D.getRecord(o.id);
+    o.applications=consumer==='none'?[]:[{id:event.id,amount:o.paid,phone:'',status:consumer==='issued'?'已完成':consumer==='failed'?'申请失败':'处理中',origin:'用户发起',invoiceType:'增值税普通发票',appliedAt:event.createdAt}];
+    var states=o.fundingIds.map(function(fid){var a=P&&P.application(fid);return !a?'none':a.hasInvoice?'issued':a.applicationStatus;});if(o.paid>0)states.push(consumer);
+    o.invoiceState=states.every(function(s){return s==='issued';})?'issued':states.some(function(s){return s==='issued';})?'partial':states.some(function(s){return s==='processing';})?'processing':states.some(function(s){return s==='failed';})?'failed':'unissued';
+    o.invoiced=o.invoiceState==='issued';return o;
+  }
+  function invoiceState(o){return o.invoiceState||(o.invoiced?'issued':'unissued');}
   var cached=null;
   function list(){
     if(!cached){var unique=new Map(samples.map(function(o){return[o.number,o];}));
-      D.findSegments(D.TODAY,null,{kind:'positive'}).forEach(function(x){[0,12,26].forEach(function(i){if(i<x.segment.count){var o=fromRecord(D.record(x,i,D.TODAY));if(!unique.has(o.number))unique.set(o.number,o);}});});
+      (window.DemoOrderExamples?window.DemoOrderExamples.orders:[]).forEach(function(o){var item=exampleOrder(o);unique.set(item.number,item);});
+      D.findSegments(D.TODAY,null,{kind:'positive'}).filter(function(x){return !x.segment.demoOrder;}).forEach(function(x){[0,12,26].forEach(function(i){if(i<x.segment.count){var o=fromRecord(D.record(x,i,D.TODAY));if(!unique.has(o.number))unique.set(o.number,o);}});});
       var refund=D.findSegments(D.TODAY,null,{kind:'refund'})[0];if(refund){var o=fromRecord(D.record(refund,0,D.TODAY));unique.set(o.number,o);}
       cached=Array.from(unique.values()).sort(function(a,b){return b.createdAt.localeCompare(a.createdAt);});
     }return cached;
   }
-  function get(id){var sample=samples.find(function(o){return o.id===id;});if(sample)return sample;return /^\d{4}-\d{2}-.+~\d+~\d+$/.test(id)?fromRecord(D.getRecord(id)):null;}
-  function filter(q){return list().filter(function(o){return(!q.order||o.number.includes(q.order))&&(!q.channel||o.channel===q.channel)&&(!q.store||(o.store+' '+o.storeCode).toLowerCase().includes(q.store.toLowerCase()))&&(!q.invoice||(q.invoice==='issued')===o.invoiced)&&(!q.returned||(q.returned==='returned')===o.returned)&&(!q.phone||[o.buyerPhone,o.recipientPhone].some(function(v){return v.includes(q.phone);}))&&(!q.createdFrom||o.createdAt.slice(0,10)>=q.createdFrom)&&(!q.createdTo||o.createdAt.slice(0,10)<=q.createdTo);});}
-  window.DemoOrderData={fixtureInvoiceRange:fixtureInvoiceRange,fixtureInvoiceEvent:fixtureInvoiceEvent,invoiceEvent:invoiceEvent,invalidate:function(){cached=null;},list:list,get:get,filter:filter,fromRecord:fromRecord,defaultDate:'2026-09-28',channels:['newPOS','微信小程序','抖音','美团秒提']};
+  function get(id){var example=window.DemoOrderExamples&&window.DemoOrderExamples.orders.find(function(o){return o.fundingIds.includes(id);});if(example)return exampleOrder(example,id);var sample=samples.find(function(o){return o.id===id;});if(sample)return sample;return /^\d{4}-\d{2}-.+~\d+~\d+$/.test(id)?fromRecord(D.getRecord(id)):null;}
+  function filter(q){return list().filter(function(o){return(!q.order||o.number.includes(q.order))&&(!q.channel||o.channel===q.channel)&&(!q.store||(o.store+' '+o.storeCode).toLowerCase().includes(q.store.toLowerCase()))&&(!q.invoice||q.invoice===invoiceState(o))&&(!q.returned||(q.returned==='returned')===o.returned)&&(!q.phone||[o.buyerPhone,o.recipientPhone].some(function(v){return v.includes(q.phone);}))&&(!q.createdFrom||o.createdAt.slice(0,10)>=q.createdFrom)&&(!q.createdTo||o.createdAt.slice(0,10)<=q.createdTo);});}
+  window.DemoOrderData={invoiceState:invoiceState,fixtureInvoiceRange:fixtureInvoiceRange,fixtureInvoiceEvent:fixtureInvoiceEvent,invoiceEvent:invoiceEvent,invalidate:function(){cached=null;},list:list,get:get,filter:filter,fromRecord:fromRecord,defaultDate:'2026-09-28',channels:['newPOS','微信小程序','支付宝小程序','抖音','美团秒提','美团外卖']};
 })();
