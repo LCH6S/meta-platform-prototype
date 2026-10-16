@@ -271,15 +271,15 @@
   function orderReissue(id,aid){
     var O=window.DemoOrderData,o=O.get(id),a=o&&o.applications.find(function(x){return x.id===aid;});if(!O.canReissue(o,a))return toast('该申请当前不可换开');
     var buyer=a.buyer||{};
-    showLayer({title:'换开',size:'standard',values:{buyerType:buyer.type||'company',name:buyer.name||'',tax:buyer.tax||'',email:a.email||''},submitLabel:'提交换开',body:function(v){
+    showLayer({title:'换开',size:'standard',values:{buyerType:buyer.type||'company',name:buyer.name||'',tax:buyer.tax||'',address:buyer.address||'',phone:buyer.phone||'',bank:buyer.bank||'',bankAccount:buyer.bankAccount||'',email:a.email||''},submitLabel:'提交换开',body:function(v){
       var type='<div class="radio-group" role="radiogroup" aria-label="抬头类型">'+[['company','企业'],['personal','个人']].map(function(x){return'<label class="radio-row"><input type="radio" name="buyerType" value="'+x[0]+'"'+(v.buyerType===x[0]?' checked':'')+'><span>'+x[1]+'</span></label>';}).join('')+'</div>';
-      return'<form id="order-reissue-form" novalidate>'+field('抬头类型',type,true)+field('购买方名称',customerInput('name',v.name,'购买方名称',true),true)+(v.buyerType==='company'?field('购买方税号',customerInput('tax',v.tax,'购买方税号',true),true):'')+field('接收邮箱',customerInput('email',v.email,'接收邮箱',true),true)+'</form>';
+      return'<form id="order-reissue-form" novalidate>'+field('抬头类型',type,true)+field('购买方名称',customerInput('name',v.name,'购买方名称',true),true)+(v.buyerType==='company'?field('购买方税号',customerInput('tax',v.tax,'购买方税号',true),true)+field('地址',customerInput('address',v.address,'地址'))+field('电话',customerInput('phone',v.phone,'电话'))+field('开户银行',customerInput('bank',v.bank,'开户银行'))+field('银行账号',customerInput('bankAccount',v.bankAccount,'银行账号')):'')+field('接收邮箱',customerInput('email',v.email,'接收邮箱',true),true)+'</form>';
     },submit:function(v){
       if(state.layer.busy)return;
       try{O.startReissue(id,aid,v);closeLayer(true);render(true);processOrderReissues();toast('换开申请已提交');}catch(err){layerError(err.message,err.field||'name');}
     }});
   }
-  function viewOrderReissue(id,aid){var o=window.DemoOrderData.get(id),a=o&&o.applications.find(function(x){return x.id===aid;});if(!a||!a.reissueOf)return;showLayer({title:'换开申请详情',size:'standard',readonly:true,body:info([['申请任务号',e(a.id)],['开票申请状态',e(a.status)],['开票发起方式',e(a.origin)],['开票金额',moneycell(a.amount)],['购买方名称',e(a.buyer.name)],['购买方税号',e(a.buyer.tax||'—')],['接收邮箱',e(a.email)],['原申请任务号',e(a.reissueOf)]])});}
+  function viewOrderReissue(id,aid){var o=window.DemoOrderData.get(id),a=o&&o.applications.find(function(x){return x.id===aid;});if(!a||!a.reissueOf)return;showLayer({title:'换开申请详情',size:'standard',readonly:true,body:info([['申请任务号',e(a.id)],['开票申请状态',e(a.status)],['开票发起方式',e(a.origin)],['开票金额',moneycell(a.amount)],['购买方名称',e(a.buyer.name)],['购买方税号',e(a.buyer.tax||'—')]].concat(a.buyer.type==='company'?[['地址',e(a.buyer.address||'—')],['电话',e(a.buyer.phone||'—')],['开户银行',e(a.buyer.bank||'—')],['银行账号',e(a.buyer.bankAccount||'—')]]:[]).concat([['接收邮箱',e(a.email)],['原申请任务号',e(a.reissueOf)]]))});}
   function ordersQuery(q,key,fields){
     key=key||'orders';fields=fields||[{key:'order',label:'订单号'},{key:'channel',label:'订单渠道',options:window.DemoOrderData.channels},{key:'store',label:'门店名或门店号'},{key:'invoice',label:'开票状态',options:[{value:'unissued',label:'未开票'},{value:'issued',label:'已开票'},{value:'partial',label:'部分开票'},{value:'processing',label:'开票中'},{value:'failed',label:'开票失败'}]},{key:'returned',label:'退货状态',options:[{value:'not-returned',label:'未退货'},{value:'returned',label:'已退货'}]},{key:'created',label:'订单创建时间',range:true},{key:'phone',label:'用户手机号'}];
     return'<form class="query orders-query" id="orders-query" data-query="'+key+'">'+fields.map(function(f){

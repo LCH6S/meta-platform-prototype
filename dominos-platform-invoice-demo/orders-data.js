@@ -70,7 +70,7 @@
     if(buyerType==='company'&&!/^[A-Z0-9]{15,20}$/.test(tax))invalid('请填写 15–20 位字母或数字的购买方税号','tax');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))invalid('请填写有效的接收邮箱','email');
     var now=Date.now(),time=new Date(now),stamp=time.getFullYear()+'-'+String(time.getMonth()+1).padStart(2,'0')+'-'+String(time.getDate()).padStart(2,'0')+' '+String(time.getHours()).padStart(2,'0')+':'+String(time.getMinutes()).padStart(2,'0');
-    var request={id:'HK'+now+'-'+reissues(o.number).length,amount:a.amount,phone:a.phone||'',status:'处理中',origin:'后台发起（换开）',invoiceType:a.invoiceType,appliedAt:stamp,reissueOf:a.id,buyer:{type:buyerType,name:name,tax:buyerType==='company'?tax:''},email:email,orderId:id,readyAt:now+2200};
+    var request={id:'HK'+now+'-'+reissues(o.number).length,amount:a.amount,phone:a.phone||'',status:'处理中',origin:'后台发起（换开）',invoiceType:a.invoiceType,appliedAt:stamp,reissueOf:a.id,buyer:{type:buyerType,name:name,tax:buyerType==='company'?tax:'',address:buyerType==='company'?String(values.address||'').trim():'',phone:buyerType==='company'?String(values.phone||'').trim():'',bank:buyerType==='company'?String(values.bank||'').trim():'',bankAccount:buyerType==='company'?String(values.bankAccount||'').trim():''},email:email,orderId:id,readyAt:now+2200};
     if(!D.db.consumerReissues)D.db.consumerReissues={};if(!D.db.consumerReissues[o.number])D.db.consumerReissues[o.number]=[];
     D.db.consumerReissues[o.number].push(request);D.save();cached=null;return request;
   }
