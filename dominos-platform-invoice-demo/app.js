@@ -259,10 +259,27 @@
       var p=D.getProject(x.project),pol=p&&D.getPolicy(p,x.policy),item=D.fundingItem(x.source),a=P&&P.application(x.id);
       return['<div>'+e(item?item.name:x.source)+'<small class="funding-item-code">'+e(x.source)+'</small></div>',moneycell(x.amount),D.getPartner(D.partnerForRecord(x))?link(D.getPartner(D.partnerForRecord(x)).name,partnerMonthPath(D.partnerForRecord(x),x.month)):'未配置',link('查看',fundingDetailPath(x.id,location.hash.slice(1)))];
     });html+=panel('平台出资明细',table([{label:'平台出资项',width:185},{label:'出资金额',numeric:true,width:115},{label:'合作伙伴',width:200},{label:'操作',action:true,width:100}],rows,'暂无平台出资明细',800));}
-    var applications=o.applications.map(function(a){return[e(a.id),moneycell(a.amount),e(a.phone||'-'),e(a.status),e(a.origin),e(a.invoiceType),e(a.appliedAt),'<div class="reference-order-actions">'+legacyOrderAction('查看')+legacyOrderAction('撤销申请')+legacyOrderAction('重新发送电子发票')+'</div>'];});
-    html+=panel('申请记录',table([{label:'申请任务号',systemId:true,width:210},{label:'开票金额',numeric:true,width:130},{label:'开票人手机号',width:150},{label:'开票申请状态',width:130},{label:'开票发起方式',width:130},{label:'发票种类',width:210},{label:'申请开票时间',width:180},{label:'操作',action:true,width:190}],applications,'暂无申请记录',1330));
+    var applications=o.applications.map(function(a){return[e(a.id),moneycell(a.amount),e(a.phone||'-'),e(a.status),e(a.origin),e(a.invoiceType),e(a.appliedAt),'<div class="reference-order-actions">'+(a.reissueOf?action('查看','order-reissue-view',id+'|'+a.id):legacyOrderAction('查看'))+(window.DemoOrderData.canReissue(o,a)?action('换开','order-reissue',id+'|'+a.id):'')+legacyOrderAction('撤销申请')+legacyOrderAction('重新发送电子发票')+'</div>'];});
+    html+=panel('申请记录',table([{label:'申请任务号',systemId:true,width:210},{label:'开票金额',numeric:true,width:130},{label:'开票人手机号',width:150},{label:'开票申请状态',width:130},{label:'开票发起方式',width:180},{label:'发票种类',width:210},{label:'申请开票时间',width:180},{label:'操作',action:true,width:230}],applications,'暂无申请记录',1330));
     return html;
   }
+  var orderReissueTimer=null;
+  function processOrderReissues(){
+    var O=window.DemoOrderData;if(orderReissueTimer||!O.hasPendingReissues())return;
+    orderReissueTimer=setTimeout(function(){orderReissueTimer=null;var changed=O.completeReissues();if(changed&&['order','orders'].includes(route().parts[0])){if(!state.layer&&!state.dirty)render(true);else state.orderReissueNeedsRender=true;}processOrderReissues();},600);
+  }
+  function orderReissue(id,aid){
+    var O=window.DemoOrderData,o=O.get(id),a=o&&o.applications.find(function(x){return x.id===aid;});if(!O.canReissue(o,a))return toast('该申请当前不可换开');
+    var buyer=a.buyer||{};
+    showLayer({title:'换开',size:'standard',values:{buyerType:buyer.type||'company',name:buyer.name||'',tax:buyer.tax||'',email:a.email||''},submitLabel:'提交换开',body:function(v){
+      var type='<div class="radio-group" role="radiogroup" aria-label="抬头类型">'+[['company','企业'],['personal','个人']].map(function(x){return'<label class="radio-row"><input type="radio" name="buyerType" value="'+x[0]+'"'+(v.buyerType===x[0]?' checked':'')+'><span>'+x[1]+'</span></label>';}).join('')+'</div>';
+      return'<form id="order-reissue-form" novalidate>'+field('抬头类型',type,true)+field('购买方名称',customerInput('name',v.name,'购买方名称',true),true)+(v.buyerType==='company'?field('购买方税号',customerInput('tax',v.tax,'购买方税号',true),true):'')+field('接收邮箱',customerInput('email',v.email,'接收邮箱',true),true)+'</form>';
+    },submit:function(v){
+      if(state.layer.busy)return;
+      try{O.startReissue(id,aid,v);closeLayer(true);render(true);processOrderReissues();toast('换开申请已提交');}catch(err){layerError(err.message,err.field||'name');}
+    }});
+  }
+  function viewOrderReissue(id,aid){var o=window.DemoOrderData.get(id),a=o&&o.applications.find(function(x){return x.id===aid;});if(!a||!a.reissueOf)return;showLayer({title:'换开申请详情',size:'standard',readonly:true,body:info([['申请任务号',e(a.id)],['开票申请状态',e(a.status)],['开票发起方式',e(a.origin)],['开票金额',moneycell(a.amount)],['购买方名称',e(a.buyer.name)],['购买方税号',e(a.buyer.tax||'—')],['接收邮箱',e(a.email)],['原申请任务号',e(a.reissueOf)]])});}
   function ordersQuery(q,key,fields){
     key=key||'orders';fields=fields||[{key:'order',label:'订单号'},{key:'channel',label:'订单渠道',options:window.DemoOrderData.channels},{key:'store',label:'门店名或门店号'},{key:'invoice',label:'开票状态',options:[{value:'unissued',label:'未开票'},{value:'issued',label:'已开票'},{value:'partial',label:'部分开票'},{value:'processing',label:'开票中'},{value:'failed',label:'开票失败'}]},{key:'returned',label:'退货状态',options:[{value:'not-returned',label:'未退货'},{value:'returned',label:'已退货'}]},{key:'created',label:'订单创建时间',range:true},{key:'phone',label:'用户手机号'}];
     return'<form class="query orders-query" id="orders-query" data-query="'+key+'">'+fields.map(function(f){
@@ -633,6 +650,7 @@
     }
     if(l.cancel&&!force){l.cancel();return;}
     overlayRoot.innerHTML='';state.layer=null;$('#shell').inert=false;document.body.style.overflow='';closeSelect();
+    if(state.orderReissueNeedsRender){state.orderReissueNeedsRender=false;render(true);}
     var f=state.lastFocus;if(f&&f.isConnected)f.focus({preventScroll:true});else main.focus({preventScroll:true});
   }
   function openConfirm(titleText,body,label,callback){showLayer({title:titleText,body:body,confirm:true,submitLabel:label,submit:callback});}
@@ -872,6 +890,8 @@
     var a=el.dataset.action,id=el.dataset.id||'';
     switch(a){
       case'show-demo-store':state.scrolls['#/orders?store=DEMO001']=0;state.query.orders={store:'优惠演示门店'};state.pages.orders=1;state.sizes.orders=20;if(location.hash==='#/orders?store=DEMO001')render();else navigate('/orders?store=DEMO001');break;
+      case'order-reissue':var orr=id.split('|');orderReissue(orr[0],orr[1]);break;
+      case'order-reissue-view':var orv=id.split('|');viewOrderReissue(orv[0],orv[1]);break;
       case'orders-date':openOrdersDate();break;
       case'orders-date-cancel':closeOrdersDate(true);break;
       case'orders-date-page':state.orderDate.month=shiftDateMonth(state.orderDate.month,Number(id));paintOrdersDate();break;
@@ -955,6 +975,7 @@
     if(ev.target.closest('.qfield'))ev.target.closest('.qfield').classList.toggle('filled',!!ev.target.value);
   });
   document.addEventListener('change',function(ev){
+    if(ev.target.name==='buyerType'&&ev.target.closest('#order-reissue-form')&&state.layer){syncLayer();state.layer.dirty=true;paintLayer();return;}
     if(ev.target.id==='tax-batch-file'){taxpayerSelectFile(ev.target.dataset.task,ev.target.files);return;}
     if(ev.target.matches('[data-bill-select],[data-bill-all]')){var r=route(),key='bills-'+r.parts[1]+'-'+r.parts[2],bills=filteredSettlements(r.parts[1],r.parts[2]),selected=syncBillSelection(key,bills);if(ev.target.hasAttribute('data-bill-all'))state.billSelections[key]=ev.target.checked?bills.filter(canIssue).map(function(b){return b.id;}):[];else{var id=ev.target.value;if(!bills.some(function(b){return b.id===id&&canIssue(b);}))return;state.billSelections[key]=ev.target.checked?Array.from(new Set(selected.concat([id]))):selected.filter(function(x){return x!==id;});}render(true);return;}
 
@@ -987,5 +1008,6 @@
   window.addEventListener('beforeunload',function(ev){if(state.dirty){ev.preventDefault();ev.returnValue='';}});
   Object.values(db.months).forEach(function(m){m.bills.forEach(function(b){if(b.status==='processing'||b.status==='reversing')finishIssue(b.id,b.activeWorkflow||b.activeRequest);});});
   if(P){P.refresh();processPreissued();}
+  window.DemoOrderData.completeReissues();processOrderReissues();
   if(!location.hash)location.hash='/overview';else render();
 })();
