@@ -166,7 +166,7 @@
   function settlement(bid){
     var b=D.bill(bid);if(!b||b.month>=D.TODAY)return notFound();var p=D.getProject(b.project),t=D.totals([b]),buyer=b.buyerSnapshot||D.getBuyer(p),seller=D.getSeller(b.seller),editable=canIssue(b);
     var nav=billBreadcrumb(b,'结算单详情');
-    var lastRequest=window.DemoSettlementWorkflow.latest(b);var actions=window.DemoSettlementWorkflow.canRetry(b,lastRequest)?(window.DemoSettlementWorkflow.preState(b).status==='failed'?'':btn(retryLabel(b),'retry-stage',bid+'|'+lastRequest.id,true)):editable?link(D.formalStatus(b)==='revoked'?'重新开票':D.formalStatus(b)==='failed'?'重试开票':'发起开票','/invoice-issue/'+bid,'btn primary'):b.status==='issued'||b.status==='reverse_failed'?btn('撤销开票','cancel-invoice',bid):btn(b.status==='reversing'?'撤销中':'开票中','',null,true,true);
+    var lastRequest=window.DemoSettlementWorkflow.latest(b);var actions=window.DemoSettlementWorkflow.canRetry(b,lastRequest)?(window.DemoSettlementWorkflow.preState(b).status==='failed'?'':btn(retryLabel(b),'retry-stage',bid+'|'+lastRequest.id,true)):editable?link(D.formalStatus(b)==='revoked'?'重新开票':D.formalStatus(b)==='failed'?'重试开票':'发起开票','/invoice-issue/'+bid,'btn primary'):b.status==='issued'||b.status==='reverse_failed'?'':btn(b.status==='reversing'?'撤销中':'开票中','',null,true,true);
     var data='<section class="panel">'+title('结算单详情','<div class="settlement-heading-actions">'+billStatusCell(b)+actions+'</div>')+'<div class="section" style="padding-top:0">'+info([['结算单号',e('JS'+bid.replace(/-/g,'').toUpperCase())],['合作伙伴',link(D.getPartner(D.partnerId(b)).name,partnerMonthPath(D.partnerId(b),b.month))],['结算月份',e(ym(b.month))],['销售方',party(seller)],['生成时间',e(nextMonth(b.month)+'-01 08:00')],['出资明细数',count(t.count)+' 条']])+'</div>'+metricRows(t,false,true,editable?'<button class="link metric-adjust" type="button" data-action="adjust-amount" data-id="'+bid+'" aria-label="调整应开票金额">调整</button>':'')+'</section>';
     if(b.status==='failed')data+='<section class="panel"><div class="notice error inline-notice">'+(lastRequest&&!lastRequest.formalId?'预票红冲未完成，正式开票尚未开始。请查看失败原因后重试。':'正式开票未成功，请查看失败原因后重试。')+'</div></section>';
     if(b.status==='reverse_failed')data+='<section class="panel"><div class="notice error inline-notice">撤销未完成，原发票仍有效。请重新发起撤销。</div></section>';
@@ -189,7 +189,7 @@
   function applicationRecordActions(b,a,detail){
     var id=b.id+'|'+a.id,inv=(b.invoices||[]).find(function(x){return x.id===a.invoiceId||x.applicationId===a.id;});
     if(a.status==='processing'||a.status==='red_pending'&&a.type==='red')return action('刷新','refresh-request',id);
-    if(a.status==='issued')return (inv?action('下载发票','download-invoice',b.id+'|'+inv.id):'—');
+    if(a.status==='issued'){var active=D.activeInvoice(b),canCancel=!detail&&inv&&active&&active.id===inv.id&&['issued','reverse_failed'].includes(b.status);return inv?'<div class="row-actions">'+(canCancel?action('撤销开票','cancel-invoice',b.id+'|'+inv.id)+' ':'')+action('下载发票','download-invoice',b.id+'|'+inv.id)+'</div>':'—';}
     if(a.status==='failed')return (window.DemoSettlementWorkflow&&window.DemoSettlementWorkflow.canRetry(b,a)?action('重试','retry-stage',id)+' ':'')+action('查看失败原因','request-failure',id);
     if(a.status==='retry_pending')return'<div class="row-actions">'+action('重试','retry-request',id)+action('查看失败原因','request-failure',id)+'</div>';
     return'—';
@@ -486,9 +486,9 @@
     var b=D.bill(bid);if(!canIssue(b))return;
     showLayer({title:'调整应开票金额',size:'standard',values:{amount:(amountOf(b)/100).toFixed(2),reason:''},submitLabel:'保存',body:function(v){return'<p class="amount-context">结算金额：<span class="money">¥ '+money(D.settlementNet(b))+'</span></p>'+field('应开票金额',input('amount',v.amount,'应开票金额',true),true)+field('调整说明','<textarea class="textarea" name="reason" aria-label="调整说明">'+e(v.reason)+'</textarea>',true);},submit:function(v){var amount=parseAmount(v.amount);if(amount===null)return layerError('请填写大于 0 且最多两位小数的金额','amount');if(amount!==amountOf(b)&&!v.reason.trim())return layerError('请填写调整说明','reason');try{D.adjustAmount(b,amount,v.reason);D.save();closeLayer(true);render(true);toast('应开票金额已更新');}catch(err){layerError(err.message,'amount');}}});
   }
-  function cancelInvoice(bid){
-    var b=D.bill(bid),inv=b&&D.activeInvoice(b);if(!inv||!['issued','reverse_failed'].includes(b.status))return;
-    showLayer({title:'撤销已开具的发票？',confirm:true,values:{reason:''},submitLabel:'确认撤销',body:function(v){return'<p>将整张红冲当前蓝票。撤销完成后，可调整应开票金额并重新开票。</p><dl class="confirm-list"><div><dt>蓝票号码</dt><dd>'+e(inv.id)+'</dd></div><div><dt>撤销金额</dt><dd>¥ '+money(inv.amount)+'</dd></div></dl><div class="cancel-reason">'+field('撤销原因','<textarea class="textarea" name="reason" aria-label="撤销原因">'+e(v.reason)+'</textarea>',true)+'</div>';},submit:function(v){if(!v.reason.trim())return layerError('请填写撤销原因','reason');try{var a=D.startReversal(bid,v.reason);closeLayer(true);render(true);toast('撤销申请已提交');finishIssue(bid,a.id);}catch(err){layerError(err.message,'reason');}}});
+  function cancelInvoice(bid,iid){
+    var b=D.bill(bid),inv=b&&D.activeInvoice(b);if(!inv||iid&&inv.id!==iid||!['issued','reverse_failed'].includes(b.status))return;
+    showLayer({title:'撤销已开具的发票？',confirm:true,values:{reason:''},submitLabel:'确认撤销',body:function(v){return'<p>将整张红冲当前蓝票。撤销完成后，可调整应开票金额并重新开票。</p><dl class="confirm-list"><div><dt>蓝票号码</dt><dd>'+e(inv.id)+'</dd></div><div><dt>撤销金额</dt><dd>¥ '+money(inv.amount)+'</dd></div></dl><div class="cancel-reason">'+field('撤销原因','<textarea class="textarea" name="reason" aria-label="撤销原因">'+e(v.reason)+'</textarea>',true)+'</div>';},submit:function(v){if(!v.reason.trim())return layerError('请填写撤销原因','reason');try{if(D.activeInvoice(b)?.id!==inv.id)throw new Error('当前有效发票已变化，请刷新后重新操作');var a=D.startReversal(bid,v.reason);closeLayer(true);render(true);toast('撤销申请已提交');finishIssue(bid,a.id);}catch(err){layerError(err.message,'reason');}}});
   }
   function menuIcon(kind){
     var paths={
@@ -931,7 +931,7 @@
       case'retry-request':var rqt=id.split('|');retryApplication(rqt[0],rqt[1]);break;
       case'request-failure':var rqe=id.split('|');showRequestFailure(rqe[0],rqe[1]);break;
       case'adjust-amount':adjustInvoiceAmount(id);break;
-      case'cancel-invoice':cancelInvoice(id);break;
+      case'cancel-invoice':var cancellation=id.split('|');cancelInvoice(cancellation[0],cancellation[1]);break;
       case'issue-email-add':syncInvoiceDraft();state.invoiceDraft.emails.push('');state.dirty=true;paintInvoiceEmails(state.invoiceDraft.emails.length-1);break;
       case'issue-email-remove':syncInvoiceDraft();state.invoiceDraft.emails.splice(Number(id),1);state.dirty=true;paintInvoiceEmails();break;
       case'cancel-issue':navigate('/settlement/'+id);break;
