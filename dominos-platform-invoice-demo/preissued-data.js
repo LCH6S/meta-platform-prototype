@@ -48,16 +48,34 @@
       if(index>=range.first&&(index-range.first)%range.step===0&&(index-range.first)/range.step<range.count)return{id:'C'+order,createdAt:range.month+'-'+String(1+ordinal%27).padStart(2,'0')+' 12:'+String(ordinal%60).padStart(2,'0'),amount:9000,status:'issued'};
     }return null;
   }
+  function seedHistoricalReversalFixtures(){
+    // New demo datasets import a coherent historical snapshot; this never repairs live user records.
+    if(!D.isFreshDemo)return;
+    Object.values(D.db.months).filter(function(m){return m.id<D.TODAY;}).forEach(function(m){m.bills.forEach(function(b){
+      var a=(b.applications||[]).filter(function(x){return x.type==='blue'&&['issued','failed','processing'].includes(x.status);}).slice(-1)[0];if(!a)return;
+      var groups=Object.values(store.groups).filter(function(g){return g.billId===b.id;});if(!groups.length)return;
+      var time=a.completedAt||a.createdAt,inv=b.invoices.find(function(x){return x.id===a.invoiceId;});
+      store.jobs[b.id]={billId:b.id,applicationId:a.id,invoiceId:inv&&inv.id||'',invoiceDate:inv&&inv.date||'',beforeSettlement:true,status:'reversed',createdAt:time,completedAt:time,fixtureBaseline:2};
+    });});
+  }
+  function retireLegacyFailureFixture(){
+    if(store.legacyFailureFixtureRetired)return;
+    // The retired fixture overwrote completed originals with exactly these three synthetic fields.
+    // Restore only when its provenance and the prior completed job are both present.
+    (store.fixtureFailureIds||[]).forEach(function(id){
+      var ov=store.overrides[id],job=store.jobs[id.split('~')[0]],found=groupFor(id);
+      if(!store.fixtureFailuresApplied||!found||!baseIndex(found.g,found.index)||!job||job.beforeSettlement||job.status!=='reversed'||!job.completedAt||!ov||ov.status!=='failed'||ov.error!=='开票服务响应超时，请稍后重试。'||Object.keys(ov).some(function(k){return !['status','error','completedAt'].includes(k);}))return;
+      store.retiredFixtureFailures=store.retiredFixtureFailures||[];store.retiredFixtureFailures.push({id:id,override:clone(ov),job:clone(job),retiredAt:now(),reason:'retired synthetic failure after completed reversal'});delete store.overrides[id];
+    });
+    store.legacyFailureFixtureRetired=1;save();
+  }
   function init(){
     if(new URLSearchParams(location.search).get('reset')==='1')localStorage.removeItem(KEY);
-    store=read();if(store){if(!store.orderFixtureRanges){captureOrderFixtureRanges();save();}initApplications();return;}
-    store={version:1,groups:{},jobs:{},overrides:{},orderEvents:{},fixtureFailureIds:[],fixtureFailuresApplied:false};
+    store=read();if(store){retireLegacyFailureFixture();if(!store.orderFixtureRanges){captureOrderFixtureRanges();save();}initApplications();return;}
+    store={version:1,groups:{},jobs:{},overrides:{},orderEvents:{},fixtureFailureIds:[],fixtureFailuresApplied:true,legacyFailureFixtureRetired:1};
     // These are imported sample results of the order-invoicing flow, not a funding-sync trigger.
     D.month(D.PREVIOUS);D.month(D.TODAY);importOrderInvoiceFixtures();captureOrderFixtureRanges();
-    save();reconcile();
-    var firstJob=Object.values(store.jobs)[0],g=firstJob&&Object.values(store.groups).find(function(g){return g.billId===firstJob.billId&&g.count>=2;});
-    if(g)store.fixtureFailureIds=[recordId(g,g.first),recordId(g,g.first+g.step)];else store.fixtureFailuresApplied=true;
-    save();initApplications();
+    seedHistoricalReversalFixtures();save();reconcile();initApplications();
   }
   function get(id){
     var found=groupFor(id);if(!found)return null;var g=found.g,index=found.index,ov=store.overrides[id]||{},job=store.jobs[g.billId],orderIndex=index+g.offset;
@@ -125,9 +143,6 @@
       if(!remaining&&overrides.length<=limit){job.status='reversed';job.completedAt=time;}job.lastProgressAt=time;changed=true;
     });
     Object.keys(store.overrides).forEach(function(id){var ov=store.overrides[id],job=store.jobs[id.split('~')[0]];if(ov.status==='reversing'&&!(job&&job.beforeSettlement)){ov.status='reversed';ov.completedAt=time;delete ov.error;changed=true;}});
-    if(!store.fixtureFailuresApplied&&store.fixtureFailureIds.every(function(id){var inv=get(id);return inv&&inv.status==='reversed';})){
-      store.fixtureFailureIds.forEach(function(id){store.overrides[id]={status:'failed',error:'开票服务响应超时，请稍后重试。',completedAt:time};});store.fixtureFailuresApplied=true;changed=true;
-    }
     if(changed)save();return changed;
   }
   function retry(id){

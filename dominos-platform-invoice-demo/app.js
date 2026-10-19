@@ -163,10 +163,15 @@
     }});
   }
 
+  function historicalSettlementContext(b){
+    var a=applicationRecords(b).find(function(x){return x.type==='blue';});if(!a)return null;
+    // A read-only view of existing formal history, never a fabricated workflow or an execution request.
+    return{process:true,historical:true,id:a.id,formalId:a.id,amount:a.amount,status:a.status,createdAt:a.createdAt,completedAt:a.completedAt,error:a.error||''};
+  }
   function settlement(bid){
     var b=D.bill(bid);if(!b||b.month>=D.TODAY)return notFound();var p=D.getProject(b.project),t=D.totals([b]),buyer=b.buyerSnapshot||D.getBuyer(p),seller=D.getSeller(b.seller),editable=canIssue(b);
     var nav=billBreadcrumb(b,'结算单详情');
-    var lastRequest=window.DemoSettlementWorkflow.latest(b);var actions=window.DemoSettlementWorkflow.canRetry(b,lastRequest)?'':editable?link(D.formalStatus(b)==='revoked'?'重新开票':D.formalStatus(b)==='failed'?'重试开票':'发起开票','/invoice-issue/'+bid,'btn primary'):b.status==='issued'||b.status==='reverse_failed'?'':btn(b.status==='reversing'?'撤销中':'开票中','',null,true,true);
+    var lastRequest=window.DemoSettlementWorkflow.latest(b)||historicalSettlementContext(b);var actions=window.DemoSettlementWorkflow.canRetry(b,lastRequest)||lastRequest?.historical&&D.formalStatus(b)==='failed'?'':editable?link(D.formalStatus(b)==='revoked'?'重新开票':D.formalStatus(b)==='failed'?'重试开票':'发起开票','/invoice-issue/'+bid,'btn primary'):b.status==='issued'||b.status==='reverse_failed'?'':btn(b.status==='reversing'?'撤销中':'开票中','',null,true,true);
     var data='<section class="panel">'+title('结算单详情','<div class="settlement-heading-actions">'+billStatusCell(b)+actions+'</div>')+'<div class="section" style="padding-top:0">'+info([['结算单号',e('JS'+bid.replace(/-/g,'').toUpperCase())],['合作伙伴',link(D.getPartner(D.partnerId(b)).name,partnerMonthPath(D.partnerId(b),b.month))],['结算月份',e(ym(b.month))],['销售方',party(seller)],['生成时间',e(nextMonth(b.month)+'-01 08:00')],['出资明细数',count(t.count)+' 条']])+'</div>'+metricRows(t,false,true,editable?'<button class="link metric-adjust" type="button" data-action="adjust-amount" data-id="'+bid+'" aria-label="调整应开票金额">调整</button>':'')+'</section>';
     if(b.status==='failed')data+='<section class="panel"><div class="notice error inline-notice">'+(lastRequest&&!lastRequest.formalId?'预票红冲未完成，正式开票尚未开始。请查看失败原因后重试。':'正式开票未成功，请查看失败原因后重试。')+'</div></section>';
     if(b.status==='reverse_failed')data+='<section class="panel"><div class="notice error inline-notice">撤销未完成，原发票仍有效。请重新发起撤销。</div></section>';
@@ -216,13 +221,13 @@
   }
   function applicationWorkflow(b,a){
     if(!a.process)return '';
-    var current=window.DemoSettlementWorkflow.latest(b)?.id===a.id,pre=window.DemoSettlementWorkflow.preState(b),live=a.status==='processing',c=current?pre.summary:a.preInvoiceSummary||pre.summary;
+    var current=!!a.historical||window.DemoSettlementWorkflow.latest(b)?.id===a.id,pre=window.DemoSettlementWorkflow.preState(b),live=a.status==='processing',c=current?pre.summary:a.preInvoiceSummary||pre.summary;
     var preCode=current?pre.status:!c.total?'none':a.preCompletedAt?'done':a.status==='failed'&&a.failureStage!=='issuing'?'failed':'processing';
     var formalCode=current?D.formalStatus(b):a.status==='issued'?'issued':a.formalId?(a.status==='failed'?'failed':'processing'):(a.formalBefore||'ready');
     var preDone=['done','none'].includes(preCode),preFail=preCode==='failed',formalFail=formalCode==='failed',preText=preProcessMap[preCode][0],formalText=formalStateMap[formalCode][0];
     var preInfo=c.issuing?'<p>仍有 '+c.issuing+' 笔预开申请处理中，结果明确后继续。</p>':'<div class="reversal-counts"><p><span>需红冲 '+count(c.total)+' 张</span><span>已成功 '+count(c.reversed)+' 张</span></p><p><span>正在红冲 '+count(c.reversing||0)+' 张</span><span>待红冲 '+count(c.waiting==null?c.pending:c.waiting)+' 张</span><span>失败 '+count(c.failed)+' 张</span></p></div>';
     var preRetry=current&&preFail&&window.DemoSettlementWorkflow.canRetry(b,a)?action('重试预票处理','retry-stage',b.id+'|'+a.id):'';
-    var formalRetry=current&&formalFail&&window.DemoSettlementWorkflow.canRetry(b,a)?action('重试开票','retry-stage',b.id+'|'+a.id):'';
+    var formalRetry=current&&formalFail?(window.DemoSettlementWorkflow.canRetry(b,a)?action('重试开票','retry-stage',b.id+'|'+a.id):a.historical&&D.canIssue(b)?link('重试开票','/invoice-issue/'+b.id):''):'';
     var html='<section class="panel">'+title('结算单开票处理',a.status==='processing'?action('刷新','refresh-process',b.id+'|'+a.id):'')+'<div class="workflow-phases"><div class="workflow-phase"><div class="workflow-phase-heading"><h2>1. 预票处理 <span class="status '+preProcessMap[preCode][1]+'">'+preText+'</span></h2>'+'<div class="actions">'+link('查看明细',settlementPreissuedPath(b.id))+preRetry+'</div></div>'+preInfo+(c.total?'<div class="red-progress" role="progressbar" aria-label="预票红冲进度" aria-valuemin="0" aria-valuemax="'+c.total+'" aria-valuenow="'+c.reversed+'"><span style="width:'+Math.round(c.reversed/c.total*100)+'%"></span></div>':'')+(preFail?'<p class="error-text">'+e(a.error)+'</p>':'')+(c.failed?'<p>'+link('查看失败',fundingDetailsPath({bill:b.id,preStatus:'reverse_failed'}))+'</p>':'')+'</div><div class="workflow-phase"><div class="workflow-phase-heading"><h2>2. 正式开票 <span class="status '+formalStateMap[formalCode][1]+'">'+formalText+'</span></h2>'+formalRetry+'</div><p>开票金额 ¥ '+money(a.amount)+'</p>'+(!a.formalId?'<p class="secondary">红冲全部成功后发起正式开票</p>':'')+(formalFail?'<p class="error-text">'+e(a.error)+'</p>':'')+'</div></div>';
     if(a.status==='failed')html+='<div class="section secondary" style="padding-top:0">以上为本次处理结束时的结果。</div>';
     return html+'</section>';
