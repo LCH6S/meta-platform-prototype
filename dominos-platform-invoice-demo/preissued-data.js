@@ -58,6 +58,23 @@
       store.jobs[b.id]={billId:b.id,applicationId:a.id,invoiceId:inv&&inv.id||'',invoiceDate:inv&&inv.date||'',beforeSettlement:true,status:'reversed',createdAt:time,completedAt:time,fixtureBaseline:2};
     });});
   }
+  function repairLegacyFormalFixtures(){
+    if(store.legacyFormalFixtureVersion)return;
+    store.legacyFormalFixtureRepairs=store.legacyFormalFixtureRepairs||[];
+    Object.values(D.db.months).filter(function(m){return m.id===D.PREVIOUS;}).forEach(function(m){m.bills.forEach(function(b){
+      // Only the original, untouched automatic demo snapshot qualifies. Never infer tax success for user activity.
+      if(!new RegExp('^'+D.PREVIOUS+'-p[1-6]-\\d+$').test(b.id)||(b.adjustments||[]).length||(b.workflowTasks||[]).length||b.activeRequest||b.activeWorkflow||(b.applications||[]).length!==1||b.attempts)return;
+      var a=b.applications[0],time=new Date(Date.UTC(Number(m.id.slice(0,4)),Number(m.id.slice(5)),1)).toISOString().slice(0,7)+'-20 10:30';
+      if(a.type!=='blue'||a.id!=='SQ'+b.id.replace(/-/g,'').toUpperCase()+'-1'||a.createdAt!==time||a.preflight||a.workflowId||a.error||a.completedAt||a.retryCount||a.history||!['issued','failed'].includes(a.status)||b.status!==a.status)return;
+      var inv=b.invoices[0];if(a.status==='issued'?(b.invoices.length!==1||!inv||inv.id!==a.invoiceId||!new RegExp('^FP'+m.id.replace('-','')+'\\d{5}$').test(inv.id)||inv.reversedBy||inv.originalId):(b.invoices.length!==0||a.invoiceId))return;
+      var groups=Object.values(store.groups).filter(function(g){return g.billId===b.id;}),job=store.jobs[b.id];
+      if(!groups.length||groups.some(function(g){return g.demoOrder||(g.extra||[]).length;})||job&&(job.beforeSettlement||job.status==='reversed'))return;
+      if(Object.keys(store.overrides||{}).some(function(id){return id.startsWith(b.id+'~');})||Object.keys(store.applications||{}).some(function(id){return id.startsWith(b.id+'~');}))return;
+      store.legacyFormalFixtureRepairs.push({billId:b.id,applicationId:a.id,previousJob:job?clone(job):null,repairedAt:now(),reason:'missing pre-stage in untouched legacy automatic fixture'});
+      store.jobs[b.id]={billId:b.id,applicationId:a.id,invoiceId:inv&&inv.id||'',invoiceDate:inv&&inv.date||'',beforeSettlement:true,status:'reversed',createdAt:time,completedAt:time,fixtureBaseline:3};
+    });});
+    store.legacyFormalFixtureVersion=1;save();
+  }
   function retireLegacyFailureFixture(){
     if(store.legacyFailureFixtureRetired)return;
     // The retired fixture overwrote completed originals with exactly these three synthetic fields.
@@ -71,8 +88,8 @@
   }
   function init(){
     if(new URLSearchParams(location.search).get('reset')==='1')localStorage.removeItem(KEY);
-    store=read();if(store){retireLegacyFailureFixture();if(!store.orderFixtureRanges){captureOrderFixtureRanges();save();}initApplications();return;}
-    store={version:1,groups:{},jobs:{},overrides:{},orderEvents:{},fixtureFailureIds:[],fixtureFailuresApplied:true,legacyFailureFixtureRetired:1};
+    store=read();if(store){retireLegacyFailureFixture();repairLegacyFormalFixtures();if(!store.orderFixtureRanges){captureOrderFixtureRanges();save();}initApplications();return;}
+    store={version:1,groups:{},jobs:{},overrides:{},orderEvents:{},fixtureFailureIds:[],fixtureFailuresApplied:true,legacyFailureFixtureRetired:1,legacyFormalFixtureVersion:1,legacyFormalFixtureRepairs:[]};
     // These are imported sample results of the order-invoicing flow, not a funding-sync trigger.
     D.month(D.PREVIOUS);D.month(D.TODAY);importOrderInvoiceFixtures();captureOrderFixtureRanges();
     seedHistoricalReversalFixtures();save();reconcile();initApplications();
