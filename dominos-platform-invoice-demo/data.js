@@ -94,7 +94,7 @@
   function invoiceDefaults(b){
     var p=getProject(b.project),snapshot=clone(b.buyerSnapshot||getBuyer(p)),partner=getPartner(b.partner||p.partner),current=partner&&partner.buyers.find(function(x){return snapshot.tax&&snapshot.tax!=='-'?x.tax===snapshot.tax:x.id===snapshot.id;});
     var buyer=clone(snapshot);if(current)['address','phone','bank','bankAccount'].forEach(function(k){buyer[k]=current[k]||'';});
-    var source=current||snapshot,remarkOptions=(source.remarkOptions||[]).filter(function(k){return ['buyerContact','buyerBank','sellerContact','sellerBank'].includes(k);});
+    var source=current||snapshot,remarkOptions=[];
     return{buyer:buyer,remarkOptions:remarkOptions.slice(),invoiceType:source.defaultType||b.invoiceType||p.invoiceType};
   }
   function getSeller(id){return sellers.find(function(s){return s.id===id;});}
@@ -382,7 +382,7 @@
     var recipients=invoiceRecipients({recipients:Array.isArray(values.emails)?values.emails:values.email?[values.email]:[]});
     if(recipients.some(function(email){return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);}))throw new Error('请填写有效的接收邮箱');
     var p=getProject(b.project),buyer=clone(values.issueBuyerSnapshot||invoiceDefaults(b).buyer),seller=clone(getSeller(b.seller));
-    var manualRemark=String(values.remark||''),remarkOptions=(values.remarkOptions||[]).filter(function(k){return['buyerContact','buyerBank','sellerContact','sellerBank'].includes(k);});
+    var manualRemark=String(values.remark||''),remarkOptions=[];
     var a={workflowId:values.workflowId||'',retryOf:values.retryOf||'',batchId:values.batchId||'',preflight:!!values.preflight,stage:values.workflowId?'issuing':values.preflight?'preparing':'issuing',id:nextApplicationId(b),type:'blue',amount:b.invoiceAmount,status:'processing',createdAt:now(),remark:composeInvoiceRemark(manualRemark,remarkOptions,buyer,seller),manualRemark:manualRemark,remarkOptions:remarkOptions,buyer:buyer,seller:seller,item:b.item,invoiceType:b.invoiceType||p.invoiceType,taxCode:b.taxCode,taxShortName:b.taxShortName,taxRate:b.taxRate,recipient:recipients[0]||'',recipients:recipients};
     b.applications.push(a);b.activeRequest=a.id;b.status='processing';b.recipient=a.recipient;b.recipients=recipients.slice();b.invoiceRemark=manualRemark;b.invoiceRemarkOptions=remarkOptions.slice();b.attempts++;save();return a;
   }

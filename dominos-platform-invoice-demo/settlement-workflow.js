@@ -12,7 +12,7 @@
  function scope(b){return JSON.stringify([b.invoiceAmount,b.seller,b.buyerSnapshot,b.item,b.taxCode,b.taxRate,b.invoiceType,b.segments]);}
  function start(bid,values){
   var b=D.refreshBill(bid);if(!D.canIssue(b))throw Error('当前结算单不能启动开票');if(b.invoiceAmount!==values.amount||!Number.isSafeInteger(values.amount)||values.amount<=0)throw Error('应开票金额已变化，请重新确认');
-  values=Object.assign({},values,{issueBuyerSnapshot:clone(values.issueBuyerSnapshot||D.invoiceDefaults(b).buyer)});if(values.issueBuyerSnapshot.tax!==(b.buyerSnapshot||D.getBuyer(D.getProject(b.project))).tax)throw Error('购买方已变化，请重新确认');
+  values=Object.assign({},values,{remarkOptions:[],issueBuyerSnapshot:clone(values.issueBuyerSnapshot||D.invoiceDefaults(b).buyer)});if(values.issueBuyerSnapshot.tax!==(b.buyerSnapshot||D.getBuyer(D.getProject(b.project))).tax)throw Error('购买方已变化，请重新确认');
   var emails=D.invoiceRecipients({recipients:values.emails||[]});if(emails.some(function(v){return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);}))throw Error('接收邮箱无效');
   b.workflowTasks=b.workflowTasks||[];var pre=preState(b),preComplete=['done','none'].includes(pre.status);var t={id:'LC'+bid.replace(/-/g,'').toUpperCase()+'-'+(b.workflowTasks.length+1),formalBefore:D.formalStatus(b),process:true,preflight:true,type:'blue',status:'processing',stage:preComplete?'issuing':'preparing',preCompletedAt:preComplete?(pre.completedAt||now()):'',amount:b.invoiceAmount,createdAt:now(),scope:scope(b),batchId:values.batchId||'',retryOf:values.retryOf||'',values:clone(values),preInvoiceSummary:P.settlementReversalState(bid)};
   b.workflowTasks.push(t);b.activeWorkflow=t.id;b.status='processing';b.invoiceRemark=values.remark||'';b.invoiceRemarkOptions=values.remarkOptions||[];b.recipients=emails;D.save();return t;
