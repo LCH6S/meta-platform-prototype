@@ -222,9 +222,16 @@
     var preDone=['done','none'].includes(preCode),preFail=preCode==='failed',formalFail=formalCode==='failed',preText=preProcessMap[preCode][0],formalText=formalStateMap[formalCode][0];
     var preInfo=c.issuing?'<p>仍有 '+c.issuing+' 笔预开申请处理中，结果明确后继续。</p>':'<div class="reversal-counts"><p><span>需红冲 '+count(c.total)+' 张</span><span>已成功 '+count(c.reversed)+' 张</span></p><p><span>正在红冲 '+count(c.reversing||0)+' 张</span><span>待红冲 '+count(c.waiting==null?c.pending:c.waiting)+' 张</span><span>失败 '+count(c.failed)+' 张</span></p></div>';
     var preRetry=current&&preFail&&window.DemoSettlementWorkflow.canRetry(b,a)?action('重试预票处理','retry-stage',b.id+'|'+a.id):'';
-    var html='<section class="panel">'+title('结算单开票处理',a.status==='processing'?action('刷新','refresh-process',b.id+'|'+a.id):'')+'<div class="workflow-phases"><div class="workflow-phase"><div class="workflow-phase-heading"><h2>1. 预票处理 <span class="status '+preProcessMap[preCode][1]+'">'+preText+'</span></h2>'+preRetry+'</div>'+preInfo+(c.total?'<div class="red-progress" role="progressbar" aria-label="预票红冲进度" aria-valuemin="0" aria-valuemax="'+c.total+'" aria-valuenow="'+c.reversed+'"><span style="width:'+Math.round(c.reversed/c.total*100)+'%"></span></div>':'')+(preFail?'<p class="error-text">'+e(a.error)+'</p>':'')+(c.failed?'<p>'+link('查看失败',fundingDetailsPath({bill:b.id,preStatus:'reverse_failed'}))+'</p>':'')+'</div><div class="workflow-phase"><h2>2. 正式开票 <span class="status '+formalStateMap[formalCode][1]+'">'+formalText+'</span></h2><p>开票金额 ¥ '+money(a.amount)+'</p>'+(!a.formalId?'<p class="secondary">红冲全部成功后发起正式开票</p>':'')+(formalFail?'<p class="error-text">'+e(a.error)+'</p>':'')+'</div></div>';
+    var html='<section class="panel">'+title('结算单开票处理',a.status==='processing'?action('刷新','refresh-process',b.id+'|'+a.id):'')+'<div class="workflow-phases"><div class="workflow-phase"><div class="workflow-phase-heading"><h2>1. 预票处理 <span class="status '+preProcessMap[preCode][1]+'">'+preText+'</span></h2>'+'<div class="actions">'+link('查看明细',settlementPreissuedPath(b.id))+preRetry+'</div></div>'+preInfo+(c.total?'<div class="red-progress" role="progressbar" aria-label="预票红冲进度" aria-valuemin="0" aria-valuemax="'+c.total+'" aria-valuenow="'+c.reversed+'"><span style="width:'+Math.round(c.reversed/c.total*100)+'%"></span></div>':'')+(preFail?'<p class="error-text">'+e(a.error)+'</p>':'')+(c.failed?'<p>'+link('查看失败',fundingDetailsPath({bill:b.id,preStatus:'reverse_failed'}))+'</p>':'')+'</div><div class="workflow-phase"><h2>2. 正式开票 <span class="status '+formalStateMap[formalCode][1]+'">'+formalText+'</span></h2><p>开票金额 ¥ '+money(a.amount)+'</p>'+(!a.formalId?'<p class="secondary">红冲全部成功后发起正式开票</p>':'')+(formalFail?'<p class="error-text">'+e(a.error)+'</p>':'')+'</div></div>';
     if(a.status==='failed')html+='<div class="section secondary" style="padding-top:0">以上为本次处理结束时的结果。</div>';
     return html+'</section>';
+  }
+  function settlementPreissuedPath(bid,q,page){var params=new URLSearchParams();['order','status'].forEach(function(k){if(q&&q[k])params.set(k,q[k]);});if(page>1)params.set('page',page);return '/settlement-preissued/'+bid+(params.toString()?'?'+params.toString():'');}
+  function settlementPreissuedPage(bid){
+    var b=D.bill(bid);if(!b||b.month>=D.TODAY)return notFound();var params=route().params,key='pre-reversal-'+bid,q={order:params.get('order')||'',status:params.get('status')||''},page=Math.max(1,parseInt(params.get('page'),10)||1),summary=P.settlementReversalState(bid),data=P.list({bill:bid,order:q.order,status:q.status},page,10),last=Math.max(1,Math.ceil(data.total/10));
+    if(page>last){page=last;data=P.list({bill:bid,order:q.order,status:q.status},page,10);}state.query[key]=q;state.pages[key]=page;
+    var states={waiting:['待红冲','default'],queued:['待红冲','default'],reversing:['红冲中','processing'],reversed:['红冲成功','success'],failed:['红冲失败','error']},back=settlementPreissuedPath(bid,q,page),rows=data.rows.map(function(a){var st=states[a.status]||['待红冲','default'];return[e(a.order),e(a.storeName),e(a.store),e(D.fundingItem(a.source)?.name||a.source),'<span class="status '+st[1]+'">'+st[0]+'</span>'+(a.error?'<div class="error-text">'+e(a.error)+'</div>':''),moneycell(a.amount),e(a.number),e(a.completedAt||'—'),link('查看',fundingDetailPath(a.fundingId,back))];});
+    return billBreadcrumb(b,'需红冲出资明细')+'<section class="panel">'+title('需红冲出资明细')+'<div class="section secondary" style="padding-top:0">结算单 JS'+e(bid.replace(/-/g,'').toUpperCase())+' · 仅包含本单关联的已开预票出资明细，保留红冲成功记录。</div>'+query(key,[{key:'order',label:'订单号'},{key:'status',label:'红冲状态',options:[{value:'pending',label:'待红冲'},{value:'reversing',label:'红冲中'},{value:'reversed',label:'红冲成功'},{value:'failed',label:'红冲失败'}]}])+'<div class="toolbar"><span>需红冲 '+count(summary.total)+' 张　已成功 '+count(summary.reversed)+' 张　正在红冲 '+count(summary.reversing)+' 张　待红冲 '+count(summary.waiting)+' 张　失败 '+count(summary.failed)+' 张</span></div>'+table([{label:'订单号',width:220},{label:'门店名',width:150},{label:'门店号',width:100},{label:'平台出资项',width:170},{label:'红冲状态',width:160},{label:'出资金额',numeric:true,width:110},{label:'蓝票号码',width:240},{label:'处理完成时间',width:170},{label:'操作',action:true,width:80}],rows,'暂无符合条件的需红冲出资明细',1400)+pagination(key,data.total,10)+'</section>';
   }
   function settlementProgress(bid,id){return settlement(bid);}
   function application(bid,aid){
@@ -233,7 +240,7 @@
     return billBreadcrumb(b,'开票申请详情')+'<section class="panel">'+title('开票申请详情',(a.workflowId?link('查看结算单处理','/settlement/'+bid)+' ':'')+applicationRecordActions(b,a,true))+'<div class="task-summary">'+info([['申请任务号',e(a.id)],['申请金额',moneycell(a.amount)],['申请类型',a.type==='red'?'红票':'蓝票'],['关联结算单',link('JS'+bid.replace(/-/g,'').toUpperCase(),'/settlement/'+bid)],['申请时间',e(a.createdAt)],['发票种类',e(a.invoiceType||b.invoiceType)]])+'<div class="task-result"><img src="assets/meta/status/'+resultIcon+'.svg" alt=""><strong>'+result+'</strong></div></div></section>'+'<section class="panel">'+title('开票信息')+'<div class="section" style="padding-top:0">'+info([['销售方',party(seller)],['购买方',party(buyer)],['开票项目名称',e(a.item||b.item||'-')],['税收分类编码',e(a.taxCode||b.taxCode||'-')],['税收分类简称',e(a.taxShortName||a.item||b.item)],['税率',rateText(a.taxRate)],['接收邮箱',recipientText(a,b)],['发票备注',e(a.remark||'-')],['撤销原因',e(a.reason||'-')]])+'</div>'+title('发票结果')+invoiceTable({id:b.id,invoices:inv?[inv]:[]})+'<div style="height:20px"></div></section>';
   }
   function resetQueryFilters(key){
-    if(key==='funding-details'){applyFundingQuery({},1);return;}
+    if(key.startsWith('pre-reversal-')){navigate(settlementPreissuedPath(key.slice(13)));return;}if(key==='funding-details'){applyFundingQuery({},1);return;}
     state.query[key]={};state.pages[key]=1;
     var r=route();
     if(r.parts[0]==='funding'&&(r.params.has('store')||r.params.has('kind'))){
@@ -372,7 +379,7 @@
     var o=window.DemoOrderData.get(a.fundingId);
     html+=card('关联订单信息',table([{label:'订单号',width:270},{label:'门店名',width:180},{label:'订单金额',numeric:true,width:130},{label:'本次开票金额',numeric:true,width:140},{label:'订单渠道',width:120},{label:'操作',action:true,width:90}],o?[[e(o.number),textcell(o.store),moneycell(o.amount),moneycell(a.amount),e(o.channel),link('查看','/order/'+a.fundingId+'?source=preissued&preinvoice='+encodeURIComponent(id))]]:[],'暂无关联订单',940));return html;
   }
-  function canRefreshPreissuedView(){return !state.dirty&&!state.layer&&!state.selectOpen&&!(document.activeElement&&document.activeElement.closest('.query'))&&['funding-detail','funding-details','preissued','preinvoice','small','small-task'].includes(route().parts[0]);}
+  function canRefreshPreissuedView(){return !state.dirty&&!state.layer&&!state.selectOpen&&!(document.activeElement&&document.activeElement.closest('.query'))&&['funding-detail','funding-details','settlement-preissued','preissued','preinvoice','small','small-task'].includes(route().parts[0]);}
   function processPreissued(){
     if(!P||preissuedTimer)return;if(!P.startPending())return;
     preissuedTimer=setTimeout(function(){preissuedTimer=null;var changed=P.finishPending();if(changed&&canRefreshPreissuedView())render(true);processPreissued();},1800);
@@ -553,6 +560,7 @@
       case'funding-item':html=fundingItemDetail(p[1]);break;
       case'funding-item-edit':html=fundingItemEdit(p[1]);break;
       case'settlement':html=settlement(p[1]);break;
+      case'settlement-preissued':html=settlementPreissuedPage(p[1]);break;
       case'settlement-progress':location.replace('#'+contextualPath('/settlement/'+p[1]));return;
       case'application':html=application(p[1],p[2]);break;
       case'invoice-issue':html=invoiceIssue(p[1]);break;
@@ -855,9 +863,9 @@
   function fundingDetailPage(id){
     var r=D.getRecord(id);if(!r)return notFound();
     var back=route().params.get('returnTo')||'',fromOrder=/^\/order\/[^?]+(?:\?|$)/.test(back);
-    if(!fromOrder&&!/^\/funding-details(?:\?|$)/.test(back))back=fundingDetailsPath({month:r.month});
+    if(!fromOrder&&!/^\/funding-details(?:\?|$)/.test(back)&&!/^\/settlement-preissued\/[^?]+(?:\?|$)/.test(back))back=fundingDetailsPath({month:r.month});
     var a=P.application(id),pid=D.partnerForRecord(r),s=fundingPreStatus(r),self=fundingDetailPath(id,back);
-    var html=customBreadcrumb([{name:fromOrder?'订单详情':'平台出资明细',path:back},{name:'出资明细详情'}]);
+    var html=customBreadcrumb([{name:fromOrder?'订单详情':back.startsWith('/settlement-preissued/')?'需红冲出资明细':'平台出资明细',path:back},{name:'出资明细详情'}]);
     html+='<section class="panel">'+title('出资明细详情',link('返回',back,'btn'))+'<div class="section">'+info([['订单号',link(r.order,'/order/'+id+'?from=funding-detail&returnTo='+encodeURIComponent(self))],['门店名',e(D.getStore(r.store)?.name||r.store)],['门店号',e(r.store)],['平台出资项',e(D.fundingItem(r.source)?.name||r.source)],['出资项编号',e(r.source)],['出资金额',moneycell(r.amount)],['明细类型',r.kind==='refund'?'平台出资退款':'平台出资'],['合作伙伴',e(D.getPartner(pid)?.name||'未配置')],['出资发生时间',e(r.occurred)],['结算单号',r.month<D.TODAY?e('JS'+r.bill.replace(/-/g,'').toUpperCase()):'尚未生成']])+'</div></section>';
     var invoiceActions=a&&a.hasInvoice?link('查看发票','/preinvoice/'+id+'?tab=original&returnTo='+encodeURIComponent(self)):'';
     var invoiceFields=[['开票状态',fundingPreBadge(r)]];
@@ -883,7 +891,7 @@
     var sl=ev.target.closest('[data-select]');if(sl){openSelect(sl.dataset.select);return;}
     if(!ev.target.closest('.select-menu'))closeSelect();
     var anchor=ev.target.closest('a[data-route]');if(anchor){ev.preventDefault();if(anchor.dataset.refreshBill)D.refreshBill(anchor.dataset.refreshBill);navigate(anchor.dataset.route);return;}
-    var page=ev.target.closest('button[data-page]');if(page&&!page.disabled){var pd=page.dataset.page.split('|');if(pd[0]==='funding-details'){applyFundingQuery(state.query['funding-details']||{},Number(pd[1]));return;}state.pages[pd[0]]=Number(pd[1]);render(true);return;}
+    var page=ev.target.closest('button[data-page]');if(page&&!page.disabled){var pd=page.dataset.page.split('|');if(pd[0].startsWith('pre-reversal-')){navigate(settlementPreissuedPath(pd[0].slice(13),state.query[pd[0]],Number(pd[1])));return;}if(pd[0]==='funding-details'){applyFundingQuery(state.query['funding-details']||{},Number(pd[1]));return;}state.pages[pd[0]]=Number(pd[1]);render(true);return;}
     var tab=ev.target.closest('[data-tab]');if(tab){var td=tab.dataset.tab.split('|');if(td[0].startsWith('preinvoice-')){navigate('/preinvoice/'+td[0].slice('preinvoice-'.length)+'?tab='+td[1]);return;}if(td[0].startsWith('project-home-')){navigate('/project/'+td[0].slice('project-home-'.length)+'?tab='+td[1]);return;}state.tabs[td[0]]=td[1];render(true);return;}
     var el=ev.target.closest('[data-action]');if(!el||el.disabled){if(ev.target.classList.contains('overlay')&&state.layer&&!state.layer.confirm&&!state.layer.dirty)closeLayer();return;}
     var a=el.dataset.action,id=el.dataset.id||'';
@@ -984,7 +992,7 @@
     if(ev.target.id==='reissue-config-form'){saveReissueConfig();return;}
     if(ev.target.id==='funding-item-form'){syncItemDraft();try{D.saveFundingItem(state.draft._item,state.draft);var code=state.draft._item;state.dirty=false;state.draft=null;navigate('/funding-item/'+code,true);toast('平台出资项已保存');}catch(error){$('#item-errors').innerHTML='<div class="notice error">'+e(error.message)+'</div>';$('#item-errors').scrollIntoView({block:'center'});}return;}
     if(ev.target.id==='invoice-form'){submitInvoice();return;}
-    if(ev.target.dataset.query){var key=ev.target.dataset.query,fd=new FormData(ev.target),q={};fd.forEach(function(v,k){q[k.startsWith(key+'-')?k.slice(key.length+1):k]=String(v);});if(key==='funding-details'){applyFundingQuery(q,1);return;}state.query[key]=q;state.pages[key]=1;render(true);return;}
+    if(ev.target.dataset.query){var key=ev.target.dataset.query,fd=new FormData(ev.target),q={};fd.forEach(function(v,k){q[k.startsWith(key+'-')?k.slice(key.length+1):k]=String(v);});if(key.startsWith('pre-reversal-')){navigate(settlementPreissuedPath(key.slice(13),q,1));return;}if(key==='funding-details'){applyFundingQuery(q,1);return;}state.query[key]=q;state.pages[key]=1;render(true);return;}
     if(state.layer){syncLayer();state.layer.submit(state.layer.values);}
   });
   document.addEventListener('keydown',function(ev){

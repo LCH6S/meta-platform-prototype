@@ -94,7 +94,7 @@
     Object.values(store.groups).sort(function(a,b){return b.month.localeCompare(a.month)||a.code.localeCompare(b.code);}).forEach(function(g){
       if(q.bill&&g.billId!==q.bill||q.month&&g.month!==q.month||q.project&&g.project!==q.project||q.store&&g.store!==q.store)return;
       runs(g).forEach(function(run){
-        if(q.status&&q.status!==run.status)return;
+        if(q.status&&!(q.status==='pending'?['waiting','queued'].includes(run.status):q.status===run.status))return;
         if(!q.number&&!q.order){
           var from=Math.max(0,skip-total),to=Math.min(run.count,skip+size-total);for(var j=from;j<to;j++)rows.push(get(recordId(g,run.start+j*run.step)));
           total+=run.count;amount+=run.count*run.amount;counts[run.status]+=run.count;return;
