@@ -360,7 +360,7 @@
   function preinvoiceView(id,params){
     var a=P&&P.application(id);if(!a)return notFound();var tab=params.get('tab'),preview=tab==='original'||tab==='red',red=tab==='red',snapshot=preview&&P.invoiceSnapshot(id,red);
     var scopedBill=params.get('settlement'),crumbs=[{name:'平台出资明细',path:fundingDetailsPath({bill:scopedBill||'',order:a.order})},{name:'开票记录',path:preinvoicePath(id)}];
-    if(preview){if(!snapshot)return notFound();crumbs.push({name:red?'红字发票':'蓝字发票'});return customBreadcrumb(crumbs)+'<section class="panel">'+title(red?'红字发票':'蓝字发票',btn('下载','pre-download',id+'|'+tab))+invoicePaper(snapshot)+'</section>';}
+    if(preview){if(!snapshot)return notFound();var previewBack=params.get('returnTo');if(previewBack&&/^\/funding-detail\/[^?]+(?:\?|$)/.test(previewBack))crumbs=[{name:'出资明细详情',path:previewBack}];crumbs.push({name:red?'红字发票':'蓝字发票'});return customBreadcrumb(crumbs)+'<section class="panel">'+title(red?'红字发票':'蓝字发票',btn('下载','pre-download',id+'|'+tab))+invoicePaper(snapshot)+'</section>';}
     function card(name,body,actions){return'<section class="panel preapplication-card">'+title(name,actions)+body+'</section>';}
     var fields=[['申请时间',e(a.appliedAt)],['申请任务号',e(a.requestNumber)],['开票申请状态',preissuedStatus(a)],['发票种类',e(a.invoiceType)],['开票金额',moneycell(a.amount)]];
     if(a.billId)fields.push(['关联结算单',preissuedBillLink('JS'+a.billId.replace(/-/g,'').toUpperCase(),a.billId)]);
@@ -862,9 +862,11 @@
     var a=P.application(id),pid=D.partnerForRecord(r),s=fundingPreStatus(r),self=fundingDetailPath(id,back);
     var html=customBreadcrumb([{name:fromOrder?'订单详情':'平台出资明细',path:back},{name:'出资明细详情'}]);
     html+='<section class="panel">'+title('出资明细详情',link('返回',back,'btn'))+'<div class="section">'+info([['订单号',link(r.order,'/order/'+id+'?from=funding-detail&returnTo='+encodeURIComponent(self))],['门店名',e(D.getStore(r.store)?.name||r.store)],['门店号',e(r.store)],['平台出资项',e(D.fundingItem(r.source)?.name||r.source)],['出资项编号',e(r.source)],['出资金额',moneycell(r.amount)],['明细类型',r.kind==='refund'?'平台出资退款':'平台出资'],['合作伙伴',e(D.getPartner(pid)?.name||'未配置')],['出资发生时间',e(r.occurred)],['结算单号',r.month<D.TODAY?e('JS'+r.bill.replace(/-/g,'').toUpperCase()):'尚未生成']])+'</div></section>';
-    html+='<section class="panel">'+title('预开票处理')+'<div class="section">'+fundingPreBadge(r);
+    var invoiceActions=a&&a.hasInvoice?link('查看发票','/preinvoice/'+id+'?tab=original&returnTo='+encodeURIComponent(self)):'';
+    var invoiceFields=[['开票状态',fundingPreBadge(r)]];
+    if(a)invoiceFields.push(['申请任务号',e(a.requestNumber)],['申请时间',e(a.appliedAt)],['蓝票号码',e(a.number||'—')],['撤销完成时间',e(a.status==='reversed'?a.completedAt:'—')]);
+    html+='<section class="panel">'+title('预开票处理',invoiceActions)+'<div class="section">'+info(invoiceFields);
     if(['failed','reverse_failed'].includes(s))html+='<p class="error-text">'+e(a.error||'未记录失败原因')+'</p>'+action(s==='failed'?'重试开票':'重试撤销','pre-retry',id);else if(['processing','revoking'].includes(s))html+=' '+action('刷新','pre-refresh',id);else if(s==='none')html+='<p class="secondary">该笔出资尚未触发预开票申请。</p>';
-    if(a)html+='<details class="funding-trace"><summary>开票记录</summary>'+info([['申请任务号',e(a.requestNumber)],['申请时间',e(a.appliedAt)],['蓝票号码',e(a.number||'—')],['撤销完成时间',e(a.status==='reversed'?a.completedAt:'—')]])+'</details>';
     return html+'</div></section>';
   }
   function retryFundingFailures(){var q=Object.assign({},state.query['funding-details']||{});if(!['failed','reverse_failed'].includes(q.preStatus))return;var ids=[];D.eachFunding(q,function(r){ids.push(r.id);});if(!ids.length){toast('当前筛选结果中没有可重试的记录');return;}openConfirm('确认批量重试','当前筛选下共 '+ids.length+' 笔失败记录，是否确认重试？','确认重试',function(){var applied=0;ids.forEach(function(id){var a=P.application(id);if(a&&a.applicationStatus===q.preStatus){P.retryApplication(id);applied++;}});closeLayer(true);processPreissued();render(true);toast('已提交 '+applied+' 笔重试');});}
