@@ -521,3 +521,5 @@ tfoot td:after{background:var(--meta-color-border)}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 #main[data-page="taxpayers"] .query{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+.workflow-phase-heading{display:flex;align-items:flex-start;gap:16px;margin-bottom:16px}.workflow-phase-heading h2{margin:0;flex-wrap:wrap}.workflow-phase-heading>.link{margin-left:auto;white-space:nowrap;flex-shrink:0}
