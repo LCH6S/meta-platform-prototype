@@ -760,10 +760,9 @@
   function monthPartners(m){var ids=new Set(m>=D.TODAY?D.findSegments(m,null,{}).map(function(x){return D.fundingItem(x.segment.source)?.partner;}):D.month(m).bills.map(D.partnerId));return db.partners.filter(function(p){return ids.has(p.id);});}
   function partnerMonthPath(pid,m){return '/partner-month/'+pid+'/'+m;}
   function partnerMonthly(pid,m){
-    var p=D.getPartner(pid);if(!p)return notFound();var bills=D.partnerBills(m,pid),t=D.totals(bills),current=m>=D.TODAY,key='bills-'+pid+'-'+m,tabkey='partner-'+pid+'-'+m,tab=state.tabs[tabkey]||'settlements';
+    var p=D.getPartner(pid);if(!p)return notFound();var bills=D.partnerBills(m,pid),t=D.totals(bills),current=m>=D.TODAY,key='bills-'+pid+'-'+m;
     var html=breadcrumb([{name:ym(m),path:'/month/'+m},{name:p.name}])+'<section class="panel">'+periodHeader(p.name,t,m,[ym(m)],link('查看合作伙伴','/cooperator/'+pid)+btn('导出月度汇总','export-partner-month',pid+'|'+m))+metricRows(t,current)+'</section>';
-    html+='<section class="panel"><div class="tabs" role="tablist" aria-label="合作伙伴月度数据">'+[['settlements','结算单'],['items','平台出资项汇总']].map(function(x){return '<button role="tab" aria-selected="'+(tab===x[0])+'" data-tab="'+tabkey+'|'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>';
-    if(tab==='items')return html+fundingItemsSummary(bills,pid,m)+'</section>';
+    html+='<section class="panel">'+title('结算单');
     if(current)return html+empty('本月结算单未生成')+'</section>';
     var shown=filteredSettlements(pid,m),selected=syncBillSelection(key,shown),amount=D.sum(shown.filter(function(b){return selected.includes(b.id);}),function(b){return b.invoiceAmount;});
     return html+query(key,[{key:'name',label:'销方名称'},{key:'tax',label:'销方税号'},{key:'preStatus',label:'预票处理状态',options:Object.keys(preProcessMap).map(function(k){return{value:k,label:preProcessMap[k][0]};})},{key:'formalStatus',label:'正式开票状态',options:Object.keys(formalStateMap).map(function(k){return{value:k,label:formalStateMap[k][0]};})}])+billBatchToolbar(pid,m,selected,amount)+tableInsideBillGroups(shown,state.billBatchModes[key]?key:null)+'<div class="table-bottom-space"></div></section>';
