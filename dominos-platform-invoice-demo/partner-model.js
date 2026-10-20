@@ -17,16 +17,28 @@
  }
  function items(){return D.sources.map(function(s){return db.fundingItemConfigs[s.code];}).filter(Boolean);}
  function getItem(code){return db.fundingItemConfigs[code];}
- function saveItem(code,value){
-  var old=getItem(code);if(!old)throw Error('平台出资项不存在');var v=clone(value),r=v.rule,p=D.getPartner(v.partner);
-  if(!v.name.trim())throw Error('请填写名称');if(!p)throw Error('请选择合作伙伴');if(!r||!p.buyers[0]||!p.buyers[0].name||!p.buyers[0].tax)throw Error('请先在合作伙伴的发票信息中维护抬头和税号');r.buyer=p.buyers[0].id;
-  if(!['order','fixed'].includes(r.sellerMode)||r.sellerMode==='fixed'&&!D.getSeller(r.sellerId))throw Error('请选择开票方');
-  var tax=D.lookupTaxCode(r.taxCode);if(!tax||!tax.shortName)throw Error('请填写有效的税收分类编码');if(!r.item.trim())throw Error('请填写开票项目名称');
-  if(r.taxRate==null||!D.taxRates.includes(Number(r.taxRate)))throw Error('请选择税率');if(!['增值税普通发票','增值税专用发票'].includes(r.invoiceType))throw Error('请选择发票种类');
-  r.partner=p.id;r.taxShortName=tax.shortName;r.taxRate=Number(r.taxRate);v.code=code;delete v._item;v.updatedAt=new Date().toISOString();db.fundingItemConfigs[code]=v;D.save();return v;
+ function itemRuleReady(item){var r=item&&item.rule;return !!(r&&String(r.item||'').trim()&&D.lookupTaxCode(r.taxCode)&&r.taxRate!=null&&D.taxRates.includes(Number(r.taxRate))&&['增值税普通发票','增值税专用发票'].includes(r.invoiceType));}
+ function migrateStoreSellers(){
+  if(db.itemStoreSellerVersion)return;
+  items().forEach(function(item){item.storeSellers=item.storeSellers||{};if(item.rule&&item.rule.sellerMode==='fixed'&&D.getSeller(item.rule.sellerId)){item.legacySellerRule=clone({sellerMode:item.rule.sellerMode,sellerId:item.rule.sellerId});D.stores.forEach(function(st){if(!Object.prototype.hasOwnProperty.call(item.storeSellers,st.id))item.storeSellers[st.id]=item.rule.sellerId;});}});
+  db.itemStoreSellerVersion=1;D.save();
  }
+ function sellerForItem(code,storeId){var item=getItem(code),st=D.getStore(storeId),id=item&&item.storeSellers&&Object.prototype.hasOwnProperty.call(item.storeSellers,storeId)?item.storeSellers[storeId]:st&&st.seller;return D.getSeller(id)||null;}
+ function storeSellerRows(code,needle,page,size){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var text=String(needle||'').trim(),rows=D.stores.filter(function(st){return !text||(st.id+' '+st.name).includes(text);});return{total:rows.length,rows:rows.slice(((page||1)-1)*(size||10),(page||1)*(size||10)).map(function(st){return{store:st,seller:sellerForItem(code,st.id),override:Object.prototype.hasOwnProperty.call(item.storeSellers||{},st.id)};})};}
+ function setStoreSellers(code,rows,persist){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var stores=new Set(D.stores.map(function(st){return st.id;})),sellers=new Set(D.sellers.map(function(x){return x.id;})),seen=new Set(),overrides=clone(item.storeSellers||{});
+  rows.forEach(function(row){if(!stores.has(row.store))throw Error('门店不存在');if(seen.has(row.store))throw Error('门店重复');seen.add(row.store);if(row.seller&&!sellers.has(row.seller))throw Error('销售方不存在');if(row.seller)overrides[row.store]=row.seller;else delete overrides[row.store];});
+  item.storeSellers=overrides;item.storeSellerVersion=(item.storeSellerVersion||0)+1;if(persist!==false)D.save();return item;
+ }
+ function saveItem(code,value){
+  var old=getItem(code);if(!old)throw Error('平台出资项不存在');var v=clone(value),r=v.rule||{},p=v.partner?D.getPartner(v.partner):null;
+  if(!String(v.name||'').trim())throw Error('请填写名称');if(v.partner&&!p)throw Error('合作伙伴不存在');v.partner=p?p.id:'';
+  r.buyer=p&&p.buyers[0]?p.buyers[0].id:'';r.partner=v.partner;r.item=String(r.item||'').trim();r.taxCode=String(r.taxCode||'').trim();var tax=r.taxCode&&D.lookupTaxCode(r.taxCode);if(r.taxCode&&!tax)throw Error('请填写有效的税收分类编码');r.taxShortName=tax?tax.shortName:'';
+  if(r.taxRate===''||r.taxRate===undefined)r.taxRate=null;if(r.taxRate!=null&&!D.taxRates.includes(Number(r.taxRate)))throw Error('请选择有效税率');if(r.taxRate!=null)r.taxRate=Number(r.taxRate);r.invoiceType=r.invoiceType||'';if(r.invoiceType&&!['增值税普通发票','增值税专用发票'].includes(r.invoiceType))throw Error('请选择有效发票种类');
+  r.sellerMode='order';r.sellerId='';v.rule=r;v.name=v.name.trim();v.code=code;v.storeSellers=clone(old.storeSellers||{});v.storeSellerVersion=old.storeSellerVersion||0;delete v._item;v.updatedAt=new Date().toISOString();db.fundingItemConfigs[code]=v;D.save();return v;
+ }
+ migrateStoreSellers();
  function summary(rows){var groups={};rows.forEach(function(b){b.segments.forEach(function(s){var item=getItem(s.source)||{name:s.source};var g=groups[s.source]||(groups[s.source]={id:s.source,name:item.name,positive:0,negative:0,count:0});g[s.cents>=0?'positive':'negative']+=s.cents*s.count;g.count+=s.count;});});return Object.values(groups).map(function(g){g.net=g.positive+g.negative;return g;});}
- function segments(m,pid,f){f=f||{};return D.findSegments(m,null,{bill:f.bill,store:f.store,kind:f.kind}).filter(function(x){return(!pid||(m>=D.TODAY?getItem(x.segment.source)?.partner:partnerId(x.bill))===pid)&&(!f.source||x.segment.source===f.source);});}
+ function segments(m,pid,f){f=f||{};return D.findSegments(m,null,{bill:f.bill,store:f.store,kind:f.kind}).filter(function(x){return(!pid||(pid==='unassigned'?!((m>=D.TODAY?getItem(x.segment.source)?.partner:partnerId(x.bill))):(m>=D.TODAY?getItem(x.segment.source)?.partner:partnerId(x.bill))===pid))&&(!f.source||x.segment.source===f.source);});}
  function records(m,pid,f,page,size){var ss=segments(m,pid,f),offset=0,start=(page-1)*size,end=start+size,rows=[];ss.forEach(function(x){var c=x.segment.count;for(var i=Math.max(0,start-offset);i<Math.min(c,end-offset);i++)rows.push(D.record(x,i,m));offset+=c;});return{rows:rows,total:offset,amount:D.sum(ss,function(x){return x.segment.count*x.segment.cents;})};}
  function monthDateRange(m){if(!/^\d{4}-\d{2}$/.test(m||''))return {};var a=m.split('-').map(Number);return{dateFrom:m+'-01',dateTo:new Date(Date.UTC(a[0],a[1],0)).toISOString().slice(0,10)};}
  function normalizeFundingQuery(q){var v=Object.assign({},q||{});if(v.month&&!v.dateFrom&&!v.dateTo)Object.assign(v,monthDateRange(v.month));if(v.createdFrom!==undefined)v.dateFrom=v.createdFrom;if(v.createdTo!==undefined)v.dateTo=v.createdTo;delete v.month;delete v.createdFrom;delete v.createdTo;return v;}
@@ -57,13 +69,15 @@
  D.queryFunding=queryFunding;D.eachFunding=eachFunding;
  // Group new funding by actual invoicing conditions, never by legacy project/policy or source code.
  function groupFunding(rows,m){var groups={},unconfigured=[];
-  rows.forEach(function(row){var item=getItem(row.source),r=item&&item.rule,p=item&&D.getPartner(item.partner),buyer=p&&r&&p.buyers[0],seller=r&&(r.sellerMode==='fixed'?r.sellerId:D.getStore(row.store)?.seller);
-   if(!r||!buyer||!seller){unconfigured.push(row);return;}
+  rows.forEach(function(row){var item=getItem(row.source),r=item&&item.rule,p=item&&D.getPartner(item.partner),buyer=p&&r&&p.buyers[0],seller=sellerForItem(row.source,row.store)?.id;
+   if(!itemRuleReady(item)||!buyer||!buyer.name||!buyer.tax||!seller){unconfigured.push(row);return;}
    var key=JSON.stringify([m,p.id,seller,buyer.tax,r.item,r.taxCode,Number(r.taxRate),r.invoiceType]);
    var g=groups[key]||(groups[key]={key:key,month:m,partner:p.id,seller:seller,buyerSnapshot:clone(buyer),item:r.item,taxCode:r.taxCode,taxShortName:r.taxShortName,taxRate:r.taxRate,invoiceType:r.invoiceType,amount:0,count:0,sources:[],members:[]});
    g.amount+=row.amount*(row.count||1);g.count+=row.count||1;if(!g.sources.includes(row.source))g.sources.push(row.source);g.members.push(clone(row));
   });return{groups:Object.values(groups),unconfigured:unconfigured};
  }
+ D.itemRuleReady=itemRuleReady;D.fundingSeller=sellerForItem;D.fundingStoreRows=storeSellerRows;D.setFundingStoreSellers=setStoreSellers;
+ D.unassignedFunding=function(m){var rows=segments(m,'unassigned',{});return{count:D.sum(rows,function(x){return x.segment.count;}),amount:D.sum(rows,function(x){return x.segment.count*x.segment.cents;})};};
  D.partnerId=partnerId;D.partnerBills=bills;D.partnerFundingItems=items;D.fundingItem=getItem;D.saveFundingItem=saveItem;D.fundingSummaries=summary;D.partnerRecords=records;D.partnerSegments=segments;D.groupPartnerFunding=groupFunding;
  D.partnerForRecord=function(r){return r.month>=D.TODAY?getItem(r.source)?.partner||'':partnerId(D.bill(r.bill));};
  db.partnerStructureVersion=1;D.save();
