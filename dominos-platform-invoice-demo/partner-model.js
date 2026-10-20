@@ -24,7 +24,7 @@
   db.itemStoreSellerVersion=1;D.save();
  }
  function sellerForItem(code,storeId){var item=getItem(code),st=D.getStore(storeId),id=item&&item.storeSellers&&Object.prototype.hasOwnProperty.call(item.storeSellers,storeId)?item.storeSellers[storeId]:st&&st.seller;return D.getSeller(id)||null;}
- function storeSellerRows(code,needle,page,size){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var text=String(needle||'').trim(),rows=D.stores.filter(function(st){return !text||(st.id+' '+st.name).includes(text);});return{total:rows.length,rows:rows.slice(((page||1)-1)*(size||10),(page||1)*(size||10)).map(function(st){return{store:st,seller:sellerForItem(code,st.id),override:Object.prototype.hasOwnProperty.call(item.storeSellers||{},st.id)};})};}
+ function storeSellerRows(code,criteria,page,size){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var q=criteria&&typeof criteria==='object'?criteria:{store:criteria||''},name=String(q.name||'').trim(),id=String(q.code||'').trim(),legacy=String(q.store||'').trim(),rows=D.stores.filter(function(st){return(!name||st.name.includes(name))&&(!id||st.id.includes(id))&&(!legacy||(st.id+' '+st.name).includes(legacy));});return{total:rows.length,rows:rows.slice(((page||1)-1)*(size||10),(page||1)*(size||10)).map(function(st){return{store:st,seller:sellerForItem(code,st.id),override:Object.prototype.hasOwnProperty.call(item.storeSellers||{},st.id)};})};}
  function setStoreSellers(code,rows,persist){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var stores=new Set(D.stores.map(function(st){return st.id;})),sellers=new Set(D.sellers.map(function(x){return x.id;})),seen=new Set(),overrides=clone(item.storeSellers||{});
   rows.forEach(function(row){if(!stores.has(row.store))throw Error('门店不存在');if(seen.has(row.store))throw Error('门店重复');seen.add(row.store);if(row.seller&&!sellers.has(row.seller))throw Error('销售方不存在');if(row.seller)overrides[row.store]=row.seller;else delete overrides[row.store];});
   item.storeSellers=overrides;item.storeSellerVersion=(item.storeSellerVersion||0)+1;if(persist!==false)D.save();return item;
@@ -35,6 +35,11 @@
   r.buyer=p&&p.buyers[0]?p.buyers[0].id:'';r.partner=v.partner;r.item=String(r.item||'').trim();r.taxCode=String(r.taxCode||'').trim();var tax=r.taxCode&&D.lookupTaxCode(r.taxCode);if(r.taxCode&&!tax)throw Error('请填写有效的税收分类编码');r.taxShortName=tax?tax.shortName:'';
   if(r.taxRate===''||r.taxRate===undefined)r.taxRate=null;if(r.taxRate!=null&&!D.taxRates.includes(Number(r.taxRate)))throw Error('请选择有效税率');if(r.taxRate!=null)r.taxRate=Number(r.taxRate);r.invoiceType=r.invoiceType||'';if(r.invoiceType&&!['增值税普通发票','增值税专用发票'].includes(r.invoiceType))throw Error('请选择有效发票种类');
   r.sellerMode='order';r.sellerId='';v.rule=r;v.name=v.name.trim();v.code=code;v.storeSellers=clone(old.storeSellers||{});v.storeSellerVersion=old.storeSellerVersion||0;delete v._item;v.updatedAt=new Date().toISOString();db.fundingItemConfigs[code]=v;D.save();return v;
+ }
+ function saveItemBasic(code,values){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var name=String(values.name||'').trim();if(!name)throw Error('请填写名称');item.name=name;item.description=String(values.description||'');item.updatedAt=new Date().toISOString();D.save();return item;}
+ function saveItemPartner(code,pid){var item=getItem(code),p=pid?D.getPartner(pid):null;if(!item)throw Error('平台出资项不存在');if(pid&&!p)throw Error('合作伙伴不存在');item.partner=p?p.id:'';item.rule=item.rule||{};item.rule.partner=item.partner;item.rule.buyer=p&&p.buyers[0]?p.buyers[0].id:'';item.updatedAt=new Date().toISOString();D.save();return item;}
+ function saveItemRule(code,values){var item=getItem(code);if(!item)throw Error('平台出资项不存在');var r=clone(item.rule||{}),taxCode=String(values.taxCode||'').trim(),tax=taxCode&&D.lookupTaxCode(taxCode),rate=values.taxRate===''||values.taxRate==null?null:Number(values.taxRate),type=values.invoiceType||'';
+  if(taxCode&&!tax)throw Error('请填写有效的税收分类编码');if(rate!=null&&!D.taxRates.includes(rate))throw Error('请选择有效税率');if(type&&!['增值税普通发票','增值税专用发票'].includes(type))throw Error('请选择有效发票种类');r.item=String(values.item||'').trim();r.taxCode=taxCode;r.taxShortName=tax?tax.shortName:'';r.taxRate=rate;r.invoiceType=type;item.rule=r;item.updatedAt=new Date().toISOString();D.save();return item;
  }
  migrateStoreSellers();
  function summary(rows){var groups={};rows.forEach(function(b){b.segments.forEach(function(s){var item=getItem(s.source)||{name:s.source};var g=groups[s.source]||(groups[s.source]={id:s.source,name:item.name,positive:0,negative:0,count:0});g[s.cents>=0?'positive':'negative']+=s.cents*s.count;g.count+=s.count;});});return Object.values(groups).map(function(g){g.net=g.positive+g.negative;return g;});}
@@ -76,6 +81,7 @@
    g.amount+=row.amount*(row.count||1);g.count+=row.count||1;if(!g.sources.includes(row.source))g.sources.push(row.source);g.members.push(clone(row));
   });return{groups:Object.values(groups),unconfigured:unconfigured};
  }
+ D.saveFundingItemBasic=saveItemBasic;D.saveFundingItemPartner=saveItemPartner;D.saveFundingItemRule=saveItemRule;
  D.itemRuleReady=itemRuleReady;D.fundingSeller=sellerForItem;D.fundingStoreRows=storeSellerRows;D.setFundingStoreSellers=setStoreSellers;
  D.unassignedFunding=function(m){var rows=segments(m,'unassigned',{});return{count:D.sum(rows,function(x){return x.segment.count;}),amount:D.sum(rows,function(x){return x.segment.count*x.segment.cents;})};};
  D.partnerId=partnerId;D.partnerBills=bills;D.partnerFundingItems=items;D.fundingItem=getItem;D.saveFundingItem=saveItem;D.fundingSummaries=summary;D.partnerRecords=records;D.partnerSegments=segments;D.groupPartnerFunding=groupFunding;
