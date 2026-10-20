@@ -607,6 +607,21 @@
     if(!state.draft&&!state.invoiceDraft)state.dirty=false;
     location.hash=path;
   }
+  function searchableSelect(id,value,opts,label){
+    var html=select(id,value,opts,label);state.selects[id].searchable=true;return html.replace('aria-controls="'+e(id)+'-menu"','aria-controls="'+e(id)+'-options"');
+  }
+  function matchingSelectOptions(def,query){
+    var key=String(query||'').trim().toLocaleLowerCase();
+    return def.options.filter(function(o){return !o.value||!key||String(o.label).toLocaleLowerCase().includes(key);});
+  }
+  function selectOptionsHtml(def,opts){
+    return opts.map(function(o){return '<button type="button" class="select-option" role="option" aria-selected="'+(String(o.value)===def.value)+'" data-option="'+e(def.id)+'" data-value="'+e(o.value)+'" title="'+e(o.label)+'">'+e(o.label)+'</button>';}).join('');
+  }
+  function filterSelect(id,query){
+    var def=state.selects[id],menu=document.getElementById(id+'-menu');if(!def||!def.searchable||!menu)return;
+    var opts=matchingSelectOptions(def,query);
+    $('.select-options',menu).innerHTML=selectOptionsHtml(def,opts)+(String(query||'').trim()&&!opts.some(function(o){return !!o.value;})?'<div class="select-empty" role="status">未找到匹配的纳税人</div>':'');
+  }
   function closeSelect(){
     if(state.selectOpen){var b=document.getElementById(state.selectOpen);if(b)b.setAttribute('aria-expanded','false');}
     $$('.select-menu').forEach(function(n){n.remove();});state.selectOpen=null;
@@ -617,9 +632,12 @@
     closeSelect();var def=state.selects[id],button=document.getElementById(id);if(!def||!button)return;
     state.selectOpen=id;button.setAttribute('aria-expanded','true');
     var rect=button.getBoundingClientRect(),menu=document.createElement('div');menu.className='select-menu';menu.id=id+'-menu';menu.setAttribute('role','listbox');menu.setAttribute('aria-label',def.label);var menuWidth=def.scope==='pre-download'?Math.max(120,rect.width):rect.width;menu.style.width=menuWidth+'px';menu.style.left=(def.scope==='pre-download'?Math.min(rect.left,window.innerWidth-menuWidth-8):rect.left)+'px';
-    var height=Math.min(256,def.options.length*32+2),top=rect.bottom+4;if(top+height>window.innerHeight-8)top=Math.max(8,rect.top-height-4);menu.style.top=top+'px';
-    menu.innerHTML=def.options.map(function(o){return'<button type="button" class="select-option" role="option" aria-selected="'+(String(o.value)===def.value)+'" data-option="'+e(id)+'" data-value="'+e(o.value)+'" title="'+e(o.label)+'">'+e(o.label)+'</button>';}).join('');
-    document.body.appendChild(menu);var selected=$('[aria-selected=true]',menu)||$('.select-option',menu);if(selected)selected.focus({preventScroll:true});
+    var height=Math.min(256,def.options.length*32+2+(def.searchable?53:0)),top=rect.bottom+4;if(top+height>window.innerHeight-8)top=Math.max(8,rect.top-height-4);menu.style.top=top+'px';
+    if(def.searchable){
+      menu.classList.add('searchable-select-menu');menu.removeAttribute('role');menu.removeAttribute('aria-label');
+      menu.innerHTML='<div class="select-search"><input class="input" type="search" autocomplete="off" aria-label="搜索税号或纳税人名称" placeholder="输入税号或纳税人名称" data-select-search="'+e(id)+'" aria-controls="'+e(id)+'-options"></div><div class="select-options" id="'+e(id)+'-options" role="listbox" aria-label="'+e(def.label)+'">'+selectOptionsHtml(def,def.options)+'</div>';
+    }else menu.innerHTML=selectOptionsHtml(def,def.options);
+    document.body.appendChild(menu);var selected=def.searchable?$('[data-select-search]',menu):($('[aria-selected=true]',menu)||$('.select-option',menu));if(selected)selected.focus({preventScroll:true});
   }
   function setSelect(id,value){
     var def=state.selects[id],button=document.getElementById(id),inputEl=$('input[name="'+id+'"]');if(!def||!button)return;var op=def.options.find(function(o){return String(o.value)===value;});
@@ -828,7 +846,7 @@
   function editFundingBasic(code){var item=D.fundingItem(code);if(!item)return;showLayer({title:'编辑基本信息',size:'standard',values:{name:item.name,description:item.description||''},submitLabel:'保存',body:function(v){return field('编号',e(code))+field('名称',input('name',v.name,'名称',true),true)+field('描述','<textarea class="textarea" name="description" aria-label="描述">'+e(v.description)+'</textarea>');},submit:function(v){try{D.saveFundingItemBasic(code,v);closeLayer(true);render(true);toast('基本信息已保存');}catch(err){layerError(err.message,'name');}}});}
   function editFundingRule(code){var item=D.fundingItem(code);if(!item)return;var r=item.rule||{},p=D.getPartner(item.partner),buyer=p&&p.buyers[0];showLayer({title:'编辑开票规则',size:'standard',values:{item:r.item||'',taxCode:r.taxCode||'',taxRate:r.taxRate==null?'':String(r.taxRate),invoiceType:r.invoiceType||buyer&&buyer.defaultType||''},submitLabel:'保存',body:function(v){return '<form id="funding-rule-form" novalidate>'+field('开票项目名称',input('item',v.item,'开票项目名称'))+field('税收分类编码',input('taxCode',v.taxCode,'税收分类编码'))+field('税收分类简称','<output id="funding-rule-short">'+e(D.lookupTaxCode(v.taxCode)?.shortName||'—')+'</output>')+field('税率',select('taxRate',v.taxRate,D.taxRates.map(function(n){return{value:String(n),label:n+'%'};}),'税率'))+field('发票种类',select('invoiceType',v.invoiceType,['增值税普通发票','增值税专用发票'],'发票种类'))+field('结算周期','自然月')+'</form>';},submit:function(v){try{D.saveFundingItemRule(code,v);closeLayer(true);render(true);toast('开票规则已保存');}catch(err){layerError(err.message,err.message.includes('编码')?'taxCode':null);}}});}
   function editFundingPartner(code){var x=D.fundingItem(code);if(!x)return;showLayer({title:'编辑合作伙伴',fundingPartner:true,size:'standard',values:{partner:x.partner||''},submitLabel:'保存',body:function(v){var p=D.getPartner(v.partner),buyer=p&&p.buyers[0];return field('合作伙伴',select('partner',v.partner,[{value:'',label:'暂不设置'}].concat(db.partners.map(function(p){return{value:p.id,label:p.name};})),'合作伙伴'))+field('购买方',buyer?party(buyer):'未设置');},submit:function(v){try{D.saveFundingItemPartner(code,v.partner||'');closeLayer(true);render(true);toast('合作伙伴已保存');}catch(err){layerError(err.message);}}});}
-  function editFundingStoreSeller(code,sid){var item=D.fundingItem(code),st=D.getStore(sid);if(!item||!st)return;var current=(item.storeSellers||{})[sid]||'',defaultSeller=D.getSeller(st.seller);showLayer({title:'修改门店销方',size:'standard',values:{seller:current},submitLabel:'保存',body:function(v){return field('门店',e(st.name+' · '+st.id))+field('销售方',select('seller',v.seller,[{value:'',label:'门店默认：'+(defaultSeller?defaultSeller.name:'未设置')}].concat(D.sellers.map(function(s){return{value:s.id,label:s.name+' · '+s.tax};})),'销售方'));},submit:function(v){try{D.setFundingStoreSellers(code,[{store:sid,seller:v.seller||''}]);closeLayer(true);render(true);toast('门店销方已保存');}catch(err){layerError(err.message);}}});}
+  function editFundingStoreSeller(code,sid){var item=D.fundingItem(code),st=D.getStore(sid);if(!item||!st)return;var current=(item.storeSellers||{})[sid]||'',defaultSeller=D.getSeller(st.seller);showLayer({title:'修改门店销方',size:'standard',values:{seller:current},submitLabel:'保存',body:function(v){return field('门店',e(st.name+' · '+st.id))+field('销售方',searchableSelect('seller',v.seller,[{value:'',label:'门店默认：'+(defaultSeller?defaultSeller.name:'未设置')}].concat(D.sellers.map(function(s){return{value:s.id,label:s.name+' · '+s.tax};})),'销售方'));},submit:function(v){try{D.setFundingStoreSellers(code,[{store:sid,seller:v.seller||''}]);closeLayer(true);render(true);toast('门店销方已保存');}catch(err){layerError(err.message);}}});}
   function fundingItemEdit(code){return fundingItemDetail(code);}
   function fundingDetailsPath(q,page){q=D.normalizeFundingQuery(q);var params=new URLSearchParams();['order','partner','dateFrom','dateTo','bill','item','store','preStatus','kind'].forEach(function(k){var v=String(q&&q[k]||'').trim();if(v){if(k==='bill'&&/^\d{4}-\d{2}-/.test(v))v='JS'+v.replace(/-/g,'').toUpperCase();params.set(k,v);}});if(page>1)params.set('page',String(page));return '/funding-details'+(params.toString()?'?'+params.toString():'');}
   function applyFundingQuery(q,page){q=D.normalizeFundingQuery(q);var path=fundingDetailsPath(q,page),clean={};new URLSearchParams(path.split('?')[1]||'').forEach(function(v,k){if(k!=='page')clean[k]=v;});state.query['funding-details']=clean;state.pages['funding-details']=page||1;if(location.hash==='#'+path)render(true);else navigate(path);}
@@ -996,6 +1014,7 @@
   document.addEventListener('dragover',function(ev){if(ev.target.closest('[data-tax-drop],[data-seller-drop]'))ev.preventDefault();});
   document.addEventListener('drop',function(ev){var sz=ev.target.closest('[data-seller-drop]');if(sz){ev.preventDefault();fundingSellerSelectFile(sz.dataset.sellerDrop,ev.dataTransfer.files);return;}var zone=ev.target.closest('[data-tax-drop]');if(zone){ev.preventDefault();taxpayerSelectFile(zone.dataset.taxDrop,ev.dataTransfer.files);}});
   document.addEventListener('input',function(ev){
+    if(ev.target.matches('[data-select-search]')){filterSelect(ev.target.dataset.selectSearch,ev.target.value);return;}
     if(ev.target.closest('#funding-rule-form')){if(ev.target.name==='taxCode')$('#funding-rule-short').textContent=D.lookupTaxCode(ev.target.value.trim())?.shortName||'—';if(state.layer)state.layer.dirty=true;return;}
     if(ev.target.closest('#reissue-config-form')){syncReissueConfig();state.dirty=true;return;}
     if(state.orderDate&&ev.target.closest('.order-date-popover')){state.orderDate.from=$('#order-date-from').value;state.orderDate.to=$('#order-date-to').value;$('.date-calendars').innerHTML=dateCalendar(state.orderDate.month)+dateCalendar(shiftDateMonth(state.orderDate.month,1));$('[data-action="orders-date-apply"]').disabled=!validOrderDateRange(state.orderDate);}
@@ -1029,9 +1048,10 @@
     if(state.orderDate&&ev.key==='Escape'){ev.preventDefault();closeOrdersDate(true);return;}
     if(state.selectOpen){
       var menu=document.getElementById(state.selectOpen+'-menu'),opts=menu?$$('[role=option]',menu):[],i=opts.indexOf(document.activeElement);
-      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();opts[(i+(ev.key==='ArrowDown'?1:-1)+opts.length)%opts.length]?.focus();return;}
+      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();opts[i<0?(ev.key==='ArrowDown'?0:opts.length-1):(i+(ev.key==='ArrowDown'?1:-1)+opts.length)%opts.length]?.focus();return;}
+      if(ev.key==='Enter'&&ev.target.matches('[data-select-search]')){ev.preventDefault();var match=ev.target.value.trim()?opts.find(function(o){return o.dataset.value;}):(opts.find(function(o){return o.getAttribute('aria-selected')==='true';})||opts[0]);if(match)setSelect(state.selectOpen,match.dataset.value);return;}
       if(ev.key==='Escape'){ev.preventDefault();var trigger=document.getElementById(state.selectOpen);closeSelect();trigger?.focus();return;}
-      if(ev.key==='Tab')closeSelect();
+      if(ev.key==='Tab'){var owner=document.getElementById(state.selectOpen);closeSelect();owner?.focus({preventScroll:true});}
     }else if(ev.target.matches('[data-select]')&&(ev.key==='ArrowDown'||ev.key==='ArrowUp')){ev.preventDefault();openSelect(ev.target.dataset.select);return;}
     if(state.layer){
       if(ev.key==='Escape'){ev.preventDefault();closeLayer();return;}
